@@ -25,6 +25,8 @@ export const editorTheme = EditorView.theme({
   },
   ".cm-lineNumbers .cm-gutterElement": { padding: "0 4px 0 16px", opacity: "0.7" },
   ".cm-activeLine": { backgroundColor: "var(--current-line)" },
+  ".cm-code-block": { backgroundColor: "var(--code-bg)" },
+  ".cm-code-block.cm-activeLine": { backgroundColor: "var(--current-line)" },
   ".cm-activeLineGutter": { backgroundColor: "var(--current-line)" },
   ".cm-activeLineGutter.cm-gutterElement": { color: "var(--text)", opacity: "1" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--accent)", borderLeftWidth: "2px" },

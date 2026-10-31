@@ -26,7 +26,7 @@ npm run tauri build
 
 - [x] 1. Shell and editor: five-band layout, theme tokens, single-file open/save
 - [x] 2. Live preview: markdown-it + DOMPurify, view modes, two-way scroll sync
-- [ ] 3. Highlighting
+- [x] 3. Highlighting: Markdown styles and fenced-code packs in the editor, Shiki in the preview
 - [ ] 4. Workspace and tabs
 - [ ] 5. Outline, toolbar and status bar
 - [ ] 6. Export and polish

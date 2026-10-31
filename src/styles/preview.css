@@ -136,6 +136,79 @@
   font-size: inherit;
 }
 
+/* Fenced code: label + Copy header above the highlighted body. */
+
+.markdown-body .code-block {
+  margin: 0 0 1em;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--code-bg);
+}
+
+.markdown-body .code-block pre {
+  margin: 0;
+  padding: 2px 16px 14px;
+  border: 0;
+  border-radius: 0;
+}
+
+.markdown-body .code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  padding: 0 6px 0 16px;
+  font: 12px var(--font-ui);
+  color: var(--muted);
+  user-select: none;
+}
+
+.markdown-body .code-copy {
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.markdown-body .code-block:hover .code-copy,
+.markdown-body .code-copy:focus-visible {
+  opacity: 1;
+}
+
+.markdown-body .code-copy:hover {
+  border-color: var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Token classes from lib/preview/highlight.ts. */
+.tok-keyword {
+  color: var(--tok-keyword);
+}
+
+.tok-string {
+  color: var(--tok-string);
+}
+
+.tok-function {
+  color: var(--tok-function);
+}
+
+.tok-number {
+  color: var(--tok-number);
+}
+
+.tok-comment {
+  color: var(--tok-comment);
+}
+
 .markdown-body table {
   display: block;
   width: max-content;

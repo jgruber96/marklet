@@ -1,7 +1,9 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, type MouseEvent } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { renderMarkdown } from "./render";
+import { onHighlighterChange } from "./highlight";
 
 /** Longest a keystroke waits before the preview re-renders (brief: within 150 ms). */
 const RENDER_INTERVAL_MS = 40;
@@ -29,7 +31,7 @@ export const Preview = forwardRef<PreviewHandle, PreviewProps>(function Preview(
 
   // Throttle: the first change schedules a render, later changes inside the
   // interval ride along with it, so typing never waits on a pause.
-  useEffect(() => {
+  const scheduleRender = () => {
     if (timer.current !== null) return;
     timer.current = window.setTimeout(() => {
       timer.current = null;
@@ -37,17 +39,36 @@ export const Preview = forwardRef<PreviewHandle, PreviewProps>(function Preview(
       if (content.current) content.current.innerHTML = renderMarkdown(source, baseDir);
       onRendered();
     }, RENDER_INTERVAL_MS);
-  }, [props.source, props.baseDir]);
+  };
 
-  useEffect(
-    () => () => {
+  useEffect(scheduleRender, [props.source, props.baseDir]);
+
+  useEffect(() => {
+    // A code block's grammar finished loading: re-render to color it.
+    const unsubscribe = onHighlighterChange(scheduleRender);
+    return () => {
+      unsubscribe();
       if (timer.current !== null) clearTimeout(timer.current);
       timer.current = null;
-    },
-    [],
-  );
+    };
+  }, []);
+
+  const copyCode = (button: HTMLButtonElement) => {
+    const code = button.closest(".code-block")?.querySelector("code")?.textContent ?? "";
+    // The native clipboard works whether or not the web view has focus.
+    const write = isTauri() ? writeText(code) : navigator.clipboard.writeText(code);
+    void write.then(
+      () => {
+        button.textContent = "Copied";
+        window.setTimeout(() => (button.textContent = "Copy"), 1200);
+      },
+      () => (button.textContent = "Copy failed"),
+    );
+  };
 
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
+    const copy = (e.target as HTMLElement).closest<HTMLButtonElement>(".code-copy");
+    if (copy) return copyCode(copy);
     const link = (e.target as HTMLElement).closest("a");
     if (!link) return;
     // Never let the web view itself navigate away from the app.

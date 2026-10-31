@@ -9,8 +9,10 @@ import {
   lineNumbers,
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { markdown } from "@codemirror/lang-markdown";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { editorTheme } from "./theme";
+import { markdownHighlighting } from "./highlight";
+import { editorCodeLanguages } from "../languages";
 
 export interface EditorHandle {
   /** Replaces the document and resets undo history (used when opening a file). */
@@ -42,7 +44,8 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(prop
         history(),
         drawSelection(),
         EditorView.lineWrapping,
-        markdown(),
+        markdown({ base: markdownLanguage, codeLanguages: editorCodeLanguages }),
+        markdownHighlighting,
         keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
         editorTheme,
         EditorView.updateListener.of((update) => {

@@ -3,6 +3,8 @@ import anchor from "markdown-it-anchor";
 import taskLists from "markdown-it-task-lists";
 import DOMPurify from "dompurify";
 import { convertFileSrc, isTauri } from "@tauri-apps/api/core";
+import { fenceTag, languageForTag } from "../languages";
+import { escapeHtml, highlightCode } from "./highlight";
 
 interface RenderEnv {
   /** Folder of the open file, for resolving relative image paths. */
@@ -23,6 +25,24 @@ md.core.ruler.push("source_lines", (state) => {
     }
   }
 });
+
+// Fenced code: a header with the language label and a Copy button, then the
+// Shiki-highlighted body, or plain escaped text for untagged or unknown
+// languages (and while a grammar is still loading).
+md.renderer.rules.fence = (tokens, idx) => {
+  const token = tokens[idx];
+  const tag = fenceTag(token.info);
+  const lang = languageForTag(tag);
+  const body = highlightCode(token.content, tag) ?? escapeHtml(token.content.replace(/\n$/, ""));
+  const label = escapeHtml(lang?.label ?? (tag || "Text"));
+  const line = token.attrGet("data-line");
+  return (
+    `<div class="code-block"${line !== null ? ` data-line="${line}"` : ""}>` +
+    `<div class="code-head"><span class="code-lang">${label}</span>` +
+    `<button type="button" class="code-copy">Copy</button></div>` +
+    `<pre><code>${body}</code></pre></div>\n`
+  );
+};
 
 const renderImage = md.renderer.rules.image!;
 md.renderer.rules.image = (tokens, idx, options, env, self) => {

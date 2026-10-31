@@ -10,6 +10,7 @@
     "core:window:allow-set-theme",
     "store:default",
     "opener:default",
+    "clipboard-manager:allow-write-text",
     "dialog:default"
   ]
 }
