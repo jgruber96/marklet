@@ -17,6 +17,7 @@ export interface EditorHandle {
   setDoc(text: string): void;
   getDoc(): string;
   focus(): void;
+  readonly view: EditorView | null;
 }
 
 interface EditorProps {
@@ -75,6 +76,9 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(prop
     },
     getDoc: () => view.current?.state.doc.toString() ?? "",
     focus: () => view.current?.focus(),
+    get view() {
+      return view.current;
+    },
   }));
 
   return <div ref={host} style={{ height: "100%" }} />;

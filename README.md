@@ -25,7 +25,7 @@ npm run tauri build
 ## Status
 
 - [x] 1. Shell and editor: five-band layout, theme tokens, single-file open/save
-- [ ] 2. Live preview
+- [x] 2. Live preview: markdown-it + DOMPurify, view modes, two-way scroll sync
 - [ ] 3. Highlighting
 - [ ] 4. Workspace and tabs
 - [ ] 5. Outline, toolbar and status bar

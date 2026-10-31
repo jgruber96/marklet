@@ -47,6 +47,23 @@ export async function saveTheme(theme: ThemeSetting): Promise<void> {
   await (await settingsStore()).set("theme", theme);
 }
 
+export type ViewMode = "editor" | "split" | "preview";
+const isViewMode = (v: unknown): v is ViewMode => v === "editor" || v === "split" || v === "preview";
+
+// Remembered per window, keyed by window label.
+const viewModeKey = () => `viewMode.${isTauri() ? getCurrentWindow().label : "main"}`;
+
+export async function loadViewMode(): Promise<ViewMode> {
+  if (!isTauri()) return "split";
+  const v = await (await settingsStore()).get(viewModeKey());
+  return isViewMode(v) ? v : "split";
+}
+
+export async function saveViewMode(mode: ViewMode): Promise<void> {
+  if (!isTauri()) return;
+  await (await settingsStore()).set(viewModeKey(), mode);
+}
+
 /** Ticks the matching item in Settings › Theme. */
 export async function syncThemeMenu(theme: ThemeSetting): Promise<void> {
   if (isTauri()) await invoke("sync_theme_menu", { theme });

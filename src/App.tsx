@@ -19,11 +19,17 @@ import {
 import {
   type ThemeSetting,
   applyTheme,
+  type ViewMode,
   isThemeSetting,
   loadTheme,
+  loadViewMode,
   saveTheme,
+  saveViewMode,
   syncThemeMenu,
 } from "./lib/stores/settings";
+import { Preview, type PreviewHandle } from "./lib/preview/Preview";
+import { ScrollSync } from "./lib/preview/scrollSync";
+import { dirOf } from "./lib/preview/render";
 import { Toolbar } from "./components/Toolbar";
 import { TabStrip } from "./components/TabStrip";
 import { StatusBar } from "./components/StatusBar";
@@ -50,6 +56,11 @@ export default function App() {
   const [cursor, setCursor] = useState({ line: 1, col: 1 });
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [split, setSplit] = useState(0.5);
+  const [viewMode, setViewModeState] = useState<ViewMode>("split");
+  const [source, setSource] = useState("");
+
+  const preview = useRef<PreviewHandle>(null);
+  const scrollSync = useRef<ScrollSync | null>(null);
 
   const isDirty = () => textRef.current !== docRef.current.savedText;
 
@@ -59,6 +70,13 @@ export default function App() {
     editor.current?.setDoc(text);
     setDirty(false);
     setWords(countWords(text));
+    setSource(text);
+    scrollSync.current?.followEditor();
+  };
+
+  const setViewMode = (mode: ViewMode) => {
+    setViewModeState(mode);
+    void saveViewMode(mode);
   };
 
   /** Saves the current document; returns false if the user cancelled the save dialog. */
@@ -172,7 +190,25 @@ export default function App() {
       applyTheme(theme);
       void syncThemeMenu(theme);
     });
+    void loadViewMode().then(setViewModeState);
   }, []);
+
+  useEffect(() => {
+    const view = editor.current?.view;
+    const p = preview.current;
+    if (!view || !p) return;
+    const sync = new ScrollSync(view, p.pane, p.content);
+    scrollSync.current = sync;
+    return () => {
+      sync.destroy();
+      scrollSync.current = null;
+    };
+  }, []);
+
+  // Scroll sync only makes sense with both panes on screen.
+  useEffect(() => {
+    scrollSync.current?.setEnabled(viewMode === "split");
+  }, [viewMode]);
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -196,7 +232,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <Toolbar onNew={() => run("new")} onOpen={() => run("open")} />
+      <Toolbar viewMode={viewMode} onViewMode={setViewMode} onNew={() => run("new")} onOpen={() => run("open")} />
       <TabStrip name={name} dirty={dirty} onClose={() => run("close-tab")} onNew={() => run("new")} />
 
       <main className="body">
@@ -204,21 +240,32 @@ export default function App() {
         <Splitter label="Resize sidebar" onDrag={(x) => setSidebarWidth(clamp(x, SIDEBAR_MIN, SIDEBAR_MAX))} />
 
         <div className="panes" ref={panes}>
-          <section className="pane pane-editor" style={{ flex: `0 0 ${split * 100}%` }}>
+          <section
+            className="pane pane-editor"
+            style={{
+              display: viewMode === "preview" ? "none" : undefined,
+              flex: viewMode === "split" ? `0 0 ${split * 100}%` : "1 1 0",
+            }}
+          >
             <Editor
               ref={editor}
               onDocChange={(text) => {
                 textRef.current = text;
                 setDirty(isDirty());
                 setWords(countWords(text));
+                setSource(text);
               }}
               onCursor={(line, col) => setCursor({ line, col })}
             />
           </section>
-          <Splitter label="Resize editor and preview" onDrag={resizeSplit} />
-          <section className="pane pane-preview">
-            <div className="preview-placeholder">Live preview arrives in milestone 2.</div>
-          </section>
+          {viewMode === "split" && <Splitter label="Resize editor and preview" onDrag={resizeSplit} />}
+          <Preview
+            ref={preview}
+            source={source}
+            baseDir={dirOf(doc.path)}
+            hidden={viewMode === "editor"}
+            onRendered={() => scrollSync.current?.afterRender()}
+          />
         </div>
       </main>
 

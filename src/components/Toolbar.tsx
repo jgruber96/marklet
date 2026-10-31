@@ -11,11 +11,20 @@ import {
   List,
   SquarePen,
 } from "lucide-react";
+import type { ViewMode } from "../lib/stores/settings";
 
 interface ToolbarProps {
+  viewMode: ViewMode;
+  onViewMode(mode: ViewMode): void;
   onNew(): void;
   onOpen(): void;
 }
+
+const viewModes: { mode: ViewMode; label: string }[] = [
+  { mode: "editor", label: "Editor" },
+  { mode: "split", label: "Split" },
+  { mode: "preview", label: "Preview" },
+];
 
 const mod = navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl+";
 const later = (milestone: number) => `Coming in milestone ${milestone}`;
@@ -29,7 +38,7 @@ const formatting = [
   { icon: List, label: "Bulleted list" },
 ];
 
-export function Toolbar({ onNew, onOpen }: ToolbarProps) {
+export function Toolbar({ viewMode, onViewMode, onNew, onOpen }: ToolbarProps) {
   return (
     <div className="toolbar">
       <button className="tb-btn" onClick={onNew} title={`New (${mod}N)`}>
@@ -52,12 +61,17 @@ export function Toolbar({ onNew, onOpen }: ToolbarProps) {
 
       <div className="tb-spacer" />
 
-      <div className="segmented" role="group" aria-label="View mode" title={later(2)}>
-        <button disabled>Editor</button>
-        <button className="active" disabled>
-          Split
-        </button>
-        <button disabled>Preview</button>
+      <div className="segmented" role="group" aria-label="View mode">
+        {viewModes.map(({ mode, label }) => (
+          <button
+            key={mode}
+            className={mode === viewMode ? "active" : undefined}
+            aria-pressed={mode === viewMode}
+            onClick={() => onViewMode(mode)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <button className="tb-btn" disabled title={later(6)}>
