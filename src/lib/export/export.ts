@@ -97,7 +97,7 @@ export async function buildHtml(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="generator" content="Nova MD">
+<meta name="generator" content="Marklet">
 <title>${escapeHtml(title)}</title>
 <style>
 ${themeCss}

@@ -54,7 +54,7 @@ export type UnsavedChoice = "save" | "discard" | "cancel";
 
 export async function askToSave(doc: Doc): Promise<UnsavedChoice> {
   const result = await message(`Do you want to save the changes you made to ${docName(doc)}?`, {
-    title: "Nova MD",
+    title: "Marklet",
     kind: "warning",
     buttons: { yes: "Save", no: "Don't Save", cancel: "Cancel" },
   });
@@ -64,7 +64,7 @@ export async function askToSave(doc: Doc): Promise<UnsavedChoice> {
 }
 
 export async function showError(err: unknown): Promise<void> {
-  await message(String(err), { title: "Nova MD", kind: "error" });
+  await message(String(err), { title: "Marklet", kind: "error" });
 }
 
 export function countWords(text: string): number {

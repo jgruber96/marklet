@@ -46,7 +46,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         Ok::<_, tauri::Error>(check)
     };
 
-    let quit_label = if cfg!(target_os = "macos") { "Quit Nova MD" } else { "Exit" };
+    let quit_label = if cfg!(target_os = "macos") { "Quit Marklet" } else { "Exit" };
     let quit_accel = if cfg!(target_os = "macos") { Some("CmdOrCtrl+Q") } else { None };
 
     let mut file = SubmenuBuilder::new(app, "File")
@@ -94,7 +94,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     if cfg!(target_os = "macos") {
         // macOS: settings live in the app menu, and an Edit menu is required
         // for the standard clipboard shortcuts to reach the web view.
-        let app_menu = SubmenuBuilder::new(app, "Nova MD")
+        let app_menu = SubmenuBuilder::new(app, "Marklet")
             .about(None)
             .separator()
             .item(&settings)

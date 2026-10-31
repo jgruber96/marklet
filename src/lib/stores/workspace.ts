@@ -33,7 +33,7 @@ export async function confirmTrash(path: string, isDir: boolean, unsaved: boolea
   const what = isDir ? `the folder “${baseName(path)}” and everything in it` : `“${baseName(path)}”`;
   const note = unsaved ? " Its unsaved changes will be lost." : "";
   return ask(`Move ${what} to the ${trashName}?${note}`, {
-    title: "Nova MD",
+    title: "Marklet",
     kind: "warning",
     okLabel: `Move to ${trashName}`,
     cancelLabel: "Cancel",

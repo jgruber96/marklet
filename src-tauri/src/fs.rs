@@ -44,7 +44,7 @@ pub fn write_file(path: String, text: String, line_ending: String, bom: bool) ->
     // Write to a sibling temp file, then rename over the target so a crash
     // mid-write never leaves a truncated document.
     let target = Path::new(&path);
-    let tmp = target.with_extension("nova-md-tmp");
+    let tmp = target.with_extension("marklet-tmp");
     std::fs::write(&tmp, out.as_bytes()).map_err(|e| format!("Could not write {path}: {e}"))?;
     std::fs::rename(&tmp, target).map_err(|e| {
         let _ = std::fs::remove_file(&tmp);
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn crlf_and_bom_survive_a_round_trip() {
-        let path = temp_path("nova-md-test-crlf.md");
+        let path = temp_path("marklet-test-crlf.md");
         let original = "\u{feff}# Title\r\n\r\nBody line\r\n";
         std::fs::write(&path, original).unwrap();
 
@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn lf_files_stay_lf_without_bom() {
-        let path = temp_path("nova-md-test-lf.md");
+        let path = temp_path("marklet-test-lf.md");
         std::fs::write(&path, "a\nb\n").unwrap();
         let read = read_file(path.clone()).unwrap();
         assert_eq!(read.line_ending, "\n");
@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn non_utf8_is_rejected() {
-        let path = temp_path("nova-md-test-latin1.md");
+        let path = temp_path("marklet-test-latin1.md");
         std::fs::write(&path, [0x63, 0x61, 0x66, 0xe9]).unwrap();
         assert!(read_file(path.clone()).is_err());
         std::fs::remove_file(&path).unwrap();
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn tree_lists_markdown_only_and_prunes_empty_folders() {
-        let root = std::env::temp_dir().join("nova-md-test-tree");
+        let root = std::env::temp_dir().join("marklet-test-tree");
         let _ = std::fs::remove_dir_all(&root);
         for dir in ["notes/deep", "empty", ".git", "node_modules/pkg"] {
             std::fs::create_dir_all(root.join(dir)).unwrap();
@@ -220,7 +220,7 @@ mod tests {
 
     #[test]
     fn create_and_rename_refuse_to_overwrite() {
-        let dir = std::env::temp_dir().join("nova-md-test-ops");
+        let dir = std::env::temp_dir().join("marklet-test-ops");
         let _ = std::fs::remove_dir_all(&dir);
         let a = dir.join("sub/a.md").to_string_lossy().into_owned();
         let b = dir.join("b.md").to_string_lossy().into_owned();

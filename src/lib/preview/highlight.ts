@@ -13,7 +13,7 @@ type Palette = (typeof PALETTE)[number];
 const color = (p: Palette) => `#00000${PALETTE.indexOf(p)}`; // Shiki wants hex; decoded below.
 
 const theme: ThemeRegistration = {
-  name: "nova",
+  name: "marklet",
   type: "light",
   fg: color("plain"),
   bg: "#ffffff",
@@ -141,7 +141,7 @@ export function highlightCode(code: string, tag: string): string | null {
   const hit = cache.get(key);
   if (hit !== undefined) return hit;
 
-  const lines = highlighter.codeToTokensBase(code.replace(/\n$/, ""), { lang: lang.shikiId, theme: "nova" });
+  const lines = highlighter.codeToTokensBase(code.replace(/\n$/, ""), { lang: lang.shikiId, theme: "marklet" });
   const html = lines
     .map((line) =>
       line

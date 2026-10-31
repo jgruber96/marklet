@@ -7,8 +7,8 @@ export const isThemeSetting = (v: unknown): v is ThemeSetting => v === "system" 
 
 // Mirror of the theme in localStorage so it can be applied before first paint;
 // settings.json (tauri-plugin-store) stays the source of truth.
-const THEME_CACHE_KEY = "nova-md:theme";
-const ACCENT_CACHE_KEY = "nova-md:accent";
+const THEME_CACHE_KEY = "marklet:theme";
+const ACCENT_CACHE_KEY = "marklet:accent";
 
 let store: Promise<Store> | null = null;
 export const settingsStore = () => (store ??= load("settings.json", { defaults: { theme: "system", accent: "blue", autosave: true }, autoSave: 200 }));

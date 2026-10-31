@@ -50,7 +50,7 @@ pub fn unwatch_folder(state: State<FolderWatcher>) {
 
 /// Skips the save temp file and anything inside hidden or build folders.
 fn is_relevant(root: &Path, path: &Path) -> bool {
-    if path.extension().is_some_and(|e| e == "nova-md-tmp") {
+    if path.extension().is_some_and(|e| e == "marklet-tmp") {
         return false;
     }
     let rel = path.strip_prefix(root).unwrap_or(path);

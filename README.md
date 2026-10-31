@@ -1,10 +1,10 @@
-# Nova MD
+# Marklet
 
 A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Tauri 2, React + TypeScript and CodeMirror 6. See [BRIEF.md](BRIEF.md) for the full spec and build order.
 
-![Nova MD in dark mode: file tree and outline on the left, Markdown source and live preview side by side](docs/screenshots/split-dark.png)
+![Marklet in dark mode: file tree and outline on the left, Markdown source and live preview side by side](docs/screenshots/split-dark.png)
 
-**[Download for Windows](https://github.com/jgruber96/nova-md/releases/latest)** (installer under 5 MB). The macOS build is still to come.
+**[Download for Windows](https://github.com/jgruber96/marklet/releases/latest)** (installer under 5 MB). The macOS build is still to come.
 
 ## Features
 
@@ -49,7 +49,7 @@ Each platform builds its own installers: on Windows, an `.msi` and an NSIS `.exe
 npm run tauri build -- --target aarch64-apple-darwin
 ```
 
-Builds are unsigned, so Windows SmartScreen and macOS Gatekeeper warn on first launch. Both register `.md` and `.markdown` files to open in Nova MD.
+Builds are unsigned, so Windows SmartScreen and macOS Gatekeeper warn on first launch. Both register `.md` and `.markdown` files to open in Marklet.
 
 ## Keyboard shortcuts
 
@@ -76,7 +76,7 @@ Not yet run on a Mac. On macOS 13+ (Apple Silicon), check:
 - [ ] Closing an unsaved tab and quitting with Cmd+Q both ask to save
 - [ ] Export as PDF opens the print dialog; its PDF button saves a light-themed copy of the preview
 - [ ] Export as HTML opens in Safari looking like the preview
-- [ ] Double-clicking a `.md` file in Finder opens it, both when Nova MD is closed and when it is running
+- [ ] Double-clicking a `.md` file in Finder opens it, both when Marklet is closed and when it is running
 
 ## Status
 

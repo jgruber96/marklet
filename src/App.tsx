@@ -400,7 +400,7 @@ export default function App() {
     if (tab.dirty) {
       if (tab.id !== activeId.current) show(tab.id);
       const reload = await ask(`${docName(tab.doc)} changed on disk. Reload it and lose your unsaved changes?`, {
-        title: "Nova MD",
+        title: "Marklet",
         kind: "warning",
         okLabel: "Reload",
         cancelLabel: "Keep My Changes",
@@ -664,7 +664,7 @@ export default function App() {
   const dirty = active?.dirty ?? false;
   const name = docName(doc);
   useEffect(() => {
-    if (isTauri()) void getCurrentWindow().setTitle(`${dirty ? "● " : ""}${name} — Nova MD`);
+    if (isTauri()) void getCurrentWindow().setTitle(`${dirty ? "● " : ""}${name} — Marklet`);
   }, [name, dirty]);
 
   const resizeSplit = (clientX: number) => {

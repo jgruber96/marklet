@@ -7,6 +7,21 @@ mod launch;
 mod menu;
 mod watcher;
 
+use tauri::Manager;
+
+/// 0.1.0 first shipped as "Nova MD" (us.darkstardev.novamd). On the first run
+/// under the new identifier, copy its settings (theme, accent, autosave, last
+/// session) across. Runs before the front end opens the store.
+fn carry_over_settings(app: &tauri::AppHandle) {
+    let Ok(dir) = app.path().app_data_dir() else { return };
+    let Some(old) = dir.parent().map(|p| p.join("us.darkstardev.novamd").join("settings.json")) else { return };
+    let new = dir.join("settings.json");
+    if !new.exists() && old.is_file() {
+        let _ = std::fs::create_dir_all(&dir);
+        let _ = std::fs::copy(old, new);
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         // Must be registered first, so a second launch exits before doing anything else.
@@ -19,6 +34,7 @@ fn main() {
         .manage(watcher::FolderWatcher::default())
         .manage(launch::LaunchFiles::default())
         .setup(|app| {
+            carry_over_settings(app.handle());
             let menu = menu::build(app.handle())?;
             app.set_menu(menu)?;
             launch::open_files(app.handle(), launch::files_from_args(std::env::args()));
@@ -41,7 +57,7 @@ fn main() {
             launch::take_launch_files
         ])
         .build(tauri::generate_context!())
-        .expect("error while building Nova MD")
+        .expect("error while building Marklet")
         .run(|_app, _event| {
             // macOS delivers double-clicked files as an event, not as arguments.
             #[cfg(target_os = "macos")]

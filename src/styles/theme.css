@@ -1,5 +1,5 @@
 /*
- * Nova MD design tokens — the single source for the editor, preview and export.
+ * Marklet design tokens — the single source for the editor, preview and export.
  * Light is the default; dark applies when the OS prefers it, unless the
  * <html data-theme="light"> override is set, or always with data-theme="dark".
  * <html data-accent> picks an accent preset; blue is the default.

@@ -2,7 +2,7 @@ import type { LanguageRegistration } from "shiki/core";
 import { LanguageDescription, LanguageSupport, StreamLanguage } from "@codemirror/language";
 
 /**
- * The fenced-code languages Nova MD supports, shared by the editor
+ * The fenced-code languages Marklet supports, shared by the editor
  * (CodeMirror language packs) and the preview (Shiki grammars). Every loader
  * is a dynamic import, so nothing is fetched until a block uses it.
  */

@@ -1,4 +1,4 @@
-# Nova MD — Build Brief
+# Marklet — Build Brief
 
 Oct 30, 2026 · @Jeff
 
@@ -9,7 +9,7 @@ Build a desktop Markdown editor for Windows and macOS from one codebase: a split
 - **Platforms:** Windows 10/11 (x64) and macOS 13+ on Apple Silicon only (no Intel Macs).
 - **Goals:** starts fast, installs small (target under 15 MB), works on plain `.md` files on disk with no database or account.
 - **Look:** clean and minimal, with light and dark themes that follow the OS by default.
-- **App name:** Nova MD, shown in the window title and package metadata.
+- **App name:** Marklet, shown in the window title and package metadata.
 - **Reference:** the approved mockup (light and dark artboards) defines the layout and colors in this brief.
 
 ## Tech stack
@@ -145,7 +145,7 @@ Ship a Windows installer and a macOS app from `npm run tauri build`, credited to
 
 - **Windows:** `.msi` and NSIS `.exe` installers; register `.md` and `.markdown` so files open in the app.
 - **macOS:** Apple Silicon-only `.dmg` (build target aarch64-apple-darwin) with the same file associations. Each installer must be built on its own OS, or by a GitHub Actions matrix later.
-- **Metadata:** product name "Nova MD"; publisher and copyright line "DarkstarDEV"; bundle identifier `us.darkstardev.novamd`.
+- **Metadata:** product name "Marklet"; publisher and copyright line "DarkstarDEV"; bundle identifier `us.darkstardev.marklet`.
 - **Signing:** unsigned for v1, so Windows SmartScreen and macOS Gatekeeper will warn on first launch.
 
 Out of scope for v1: WYSIWYG editing, Mermaid and math rendering, image paste, Git integration, cloud sync, plugins, spell check, mobile builds, auto-update.

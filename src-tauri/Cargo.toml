@@ -1,7 +1,7 @@
 [package]
-name = "nova-md"
+name = "marklet"
 version = "0.1.0"
-description = "Nova MD — a Markdown editor"
+description = "Marklet — a Markdown editor"
 authors = ["DarkstarDEV"]
 license = "MIT"
 edition = "2021"

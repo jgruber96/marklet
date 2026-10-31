@@ -1,4 +1,4 @@
-//! Files the OS asks Nova MD to open: double-clicked `.md` files (command-line
+//! Files the OS asks Marklet to open: double-clicked `.md` files (command-line
 //! arguments on Windows, open events on macOS), including when the app is
 //! already running.
 
