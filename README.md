@@ -2,6 +2,27 @@
 
 A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Tauri 2, React + TypeScript and CodeMirror 6. See [BRIEF.md](BRIEF.md) for the full spec and build order.
 
+![Nova MD in dark mode: file tree and outline on the left, Markdown source and live preview side by side](docs/screenshots/split-dark.png)
+
+**[Download for Windows](https://github.com/jgruber96/nova-md/releases/latest)** (installer under 5 MB). The macOS build is still to come.
+
+## Features
+
+- **Live preview** beside the editor, updated as you type, with scroll kept in sync both ways
+- **Folder workspace**: a tree of every Markdown file with new, rename and delete, which follows changes made outside the app
+- **Tabs** with an unsaved dot, a save prompt on close, and session restore on the next launch
+- **Outline** of the current file's headings; click one to jump both panes there
+- **Syntax highlighting** for Markdown and for code in 12 languages, with the same colors in the editor and the preview
+- **Formatting** buttons and shortcuts, plus autosave after 2 seconds idle
+- **Export** to a standalone HTML file or to PDF
+- **Light and dark** themes that follow the OS, with an override and six accent colors
+
+## Screenshots
+
+| Light | Code and tables |
+| --- | --- |
+| ![Split view in the light theme](docs/screenshots/split-light.png) | ![Highlighted TypeScript, a table and a blockquote in the dark theme](docs/screenshots/code-dark.png) |
+
 ## Prerequisites
 
 - Node.js 20+ and npm
