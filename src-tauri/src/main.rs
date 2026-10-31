@@ -28,7 +28,8 @@ fn main() {
             fs::trash_path,
             watcher::watch_folder,
             watcher::unwatch_folder,
-            menu::sync_theme_menu
+            menu::sync_theme_menu,
+            menu::set_menu_checked
         ])
         .run(tauri::generate_context!())
         .expect("error while running Nova MD");

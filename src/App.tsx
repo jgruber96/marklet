@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -6,6 +6,7 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { EditorState, StateEffect } from "@codemirror/state";
 import { Editor, type EditorHandle } from "./lib/editor/Editor";
+import { type FormatKind, formatCommands } from "./lib/editor/format";
 import { Sidebar } from "./lib/sidebar/Sidebar";
 import {
   type Doc,
@@ -25,10 +26,13 @@ import {
   type ViewMode,
   flushSettings,
   isThemeSetting,
+  loadAutosave,
   loadTheme,
   loadViewMode,
+  saveAutosave,
   saveTheme,
   saveViewMode,
+  setMenuChecked,
   syncThemeMenu,
 } from "./lib/stores/settings";
 import {
@@ -53,6 +57,8 @@ import { Splitter } from "./components/Splitter";
 const SIDEBAR_MIN = 180;
 const SIDEBAR_MAX = 420;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+/** Autosave runs after this long without typing (brief: 2 seconds). */
+const AUTOSAVE_IDLE_MS = 2000;
 
 interface Tab {
   id: number;
@@ -63,6 +69,8 @@ interface Tab {
   dirty: boolean;
   /** The file was deleted or moved away on disk; saving writes it back. */
   missing: boolean;
+  /** Autosave failed for this tab; it waits for a manual save so errors don't repeat. */
+  autosaveFailed?: boolean;
 }
 
 export default function App() {
@@ -82,7 +90,11 @@ export default function App() {
   const expanded = useRef(new Set<string>());
 
   const [words, setWords] = useState(0);
-  const [cursor, setCursor] = useState({ line: 1, col: 1 });
+  const [cursor, setCursor] = useState({ line: 1, col: 1, selected: 0 });
+  const [autosave, setAutosaveState] = useState(true);
+  const autosaveOn = useRef(true);
+  const autosaveTimer = useRef<number | undefined>(undefined);
+  const scrollListeners = useRef(new Set<() => void>());
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [split, setSplit] = useState(0.5);
   const [viewMode, setViewModeState] = useState<ViewMode>("split");
@@ -180,6 +192,7 @@ export default function App() {
     }
     tab.doc = { ...tab.doc, path, savedText: text };
     tab.missing = false;
+    tab.autosaveFailed = false;
     updateDirty(tab);
     persistSession();
     return true;
@@ -225,6 +238,50 @@ export default function App() {
     } else {
       tab.state = tab.state.update({ changes: { from: 0, to: tab.state.doc.length, insert: text } }).state;
     }
+  };
+
+  // ---- Autosave ----
+
+  /** Restarts the idle timer; when it fires, every unsaved tab that has a file is saved. */
+  const scheduleAutosave = () => {
+    clearTimeout(autosaveTimer.current);
+    if (!autosaveOn.current) return;
+    autosaveTimer.current = window.setTimeout(() => void exclusive(autosaveAll, true), AUTOSAVE_IDLE_MS);
+  };
+
+  const autosaveAll = async () => {
+    if (!autosaveOn.current) return;
+    for (const tab of [...tabs.current]) {
+      updateDirty(tab);
+      // Untitled tabs need a name first, and a file deleted on disk stays deleted until saved by hand.
+      if (!tab.dirty || !tab.doc.path || tab.missing || tab.autosaveFailed) continue;
+      if (!(await saveTab(tab))) tab.autosaveFailed = true;
+    }
+  };
+
+  const setAutosave = async (on: boolean) => {
+    autosaveOn.current = on;
+    setAutosaveState(on);
+    void setMenuChecked("autosave", on);
+    await saveAutosave(on);
+    if (on) scheduleAutosave();
+    else clearTimeout(autosaveTimer.current);
+  };
+
+  // ---- Outline and formatting ----
+
+  const jumpToLine = (line: number) => scrollSync.current?.jumpTo(line);
+  const outlineTopLine = useCallback(() => scrollSync.current?.topLine() ?? null, []);
+  const onOutlineScroll = useCallback((listener: () => void) => {
+    scrollListeners.current.add(listener);
+    return () => void scrollListeners.current.delete(listener);
+  }, []);
+
+  const format = (kind: FormatKind) => {
+    const view = editor.current?.view;
+    if (!view || viewMode === "preview") return;
+    formatCommands[kind](view);
+    view.focus();
   };
 
   // ---- Workspace ----
@@ -397,8 +454,8 @@ export default function App() {
   };
 
   // Latest handlers for listeners registered once.
-  const actions = useRef({ commands, onFsChange, setTheme, confirmDiscard });
-  actions.current = { commands, onFsChange, setTheme, confirmDiscard };
+  const actions = useRef({ commands, onFsChange, setTheme, setAutosave, confirmDiscard });
+  actions.current = { commands, onFsChange, setTheme, setAutosave, confirmDiscard };
 
   // Serialize file actions so a second trigger can't open a second dialog. A
   // shortcut can arrive both as a keydown and as a menu accelerator, so the
@@ -452,7 +509,9 @@ export default function App() {
     if (!isTauri()) return;
     const unlisten = listen<string>("menu", ({ payload: id }) => {
       const theme = id.startsWith("theme:") ? id.slice("theme:".length) : null;
+      // Settings apply right away, even while a dialog holds the file-action lock.
       if (isThemeSetting(theme)) void actions.current.setTheme(theme);
+      else if (id === "autosave") void actions.current.setAutosave(!autosaveOn.current);
       else run(id);
     });
     const unwatch = listen<string[]>("fs-change", ({ payload }) => actions.current.onFsChange(payload));
@@ -470,6 +529,11 @@ export default function App() {
       void syncThemeMenu(theme);
     });
     void loadViewMode().then(setViewModeState);
+    void loadAutosave().then((on) => {
+      autosaveOn.current = on;
+      setAutosaveState(on);
+      void setMenuChecked("autosave", on);
+    });
     if (started.current) return;
     started.current = true;
     void exclusive(async () => {
@@ -494,7 +558,7 @@ export default function App() {
     const view = editor.current?.view;
     const p = preview.current;
     if (!view || !p) return;
-    const sync = new ScrollSync(view, p.pane, p.content);
+    const sync = new ScrollSync(view, p.pane, p.content, () => scrollListeners.current.forEach((fn) => fn()));
     scrollSync.current = sync;
     return () => {
       sync.destroy();
@@ -548,6 +612,7 @@ export default function App() {
         onNew={() => run("new")}
         onOpen={() => run("open")}
         onOpenFolder={() => run("open-folder")}
+        onFormat={format}
       />
       <TabStrip
         tabs={tabs.current.map((t) => ({ id: t.id, name: docName(t.doc), title: t.doc.path ?? docName(t.doc), dirty: t.dirty }))}
@@ -571,6 +636,7 @@ export default function App() {
           onRename={(path, newName) => renameEntry(path, newName)}
           onDelete={(node) => void exclusive(() => deleteEntry(node))}
           onReveal={(path) => void revealItemInDir(path)}
+          outline={{ source, topLine: outlineTopLine, onScroll: onOutlineScroll, onJump: jumpToLine }}
         />
         <Splitter label="Resize sidebar" onDrag={(x) => setSidebarWidth(clamp(x, SIDEBAR_MIN, SIDEBAR_MAX))} />
 
@@ -589,8 +655,9 @@ export default function App() {
                 if (tab) updateDirty(tab);
                 setWords(countWords(text));
                 setSource(text);
+                scheduleAutosave();
               }}
-              onCursor={(line, col) => setCursor({ line, col })}
+              onCursor={(line, col, selected) => setCursor({ line, col, selected })}
             />
           </section>
           {viewMode === "split" && <Splitter label="Resize editor and preview" onDrag={resizeSplit} />}
@@ -605,7 +672,7 @@ export default function App() {
         </div>
       </main>
 
-      <StatusBar doc={doc} dirty={dirty} line={cursor.line} col={cursor.col} words={words} />
+      <StatusBar doc={doc} dirty={dirty} autosave={autosave} {...cursor} words={words} />
     </div>
   );
 }

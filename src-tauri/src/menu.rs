@@ -6,8 +6,8 @@ use tauri::{AppHandle, Emitter, Manager, Wry};
 
 const THEMES: [(&str, &str); 3] = [("system", "System"), ("light", "Light"), ("dark", "Dark")];
 
-/// The Theme check items, kept so exactly one can be ticked at a time.
-pub struct ThemeItems(Vec<(&'static str, CheckMenuItem<Wry>)>);
+/// Check items by id (`theme:*`, `autosave`), so their ticks can follow the front end's settings.
+pub struct CheckItems(Vec<(String, CheckMenuItem<Wry>)>);
 
 pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let item = |id: &str, label: &str, accel: Option<&str>| {
@@ -36,17 +36,19 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     }
     let file = file.build()?;
 
-    let mut theme_items = Vec::new();
+    let mut check_items = Vec::new();
     let mut theme = SubmenuBuilder::new(app, "Theme");
     for (id, label) in THEMES {
         let check = CheckMenuItemBuilder::with_id(format!("theme:{id}"), label)
             .checked(id == "system")
             .build(app)?;
         theme = theme.item(&check);
-        theme_items.push((id, check));
+        check_items.push((format!("theme:{id}"), check));
     }
     let theme = theme.build()?;
-    app.manage(ThemeItems(theme_items));
+    let autosave = CheckMenuItemBuilder::with_id("autosave", "Autosave").checked(true).build(app)?;
+    check_items.push(("autosave".into(), autosave.clone()));
+    app.manage(CheckItems(check_items));
 
     let menu = Menu::new(app)?;
     if cfg!(target_os = "macos") {
@@ -55,7 +57,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         let app_menu = SubmenuBuilder::new(app, "Nova MD")
             .about(None)
             .separator()
-            .item(&settings_menu(app, &theme)?)
+            .item(&settings_menu(app, &theme, &autosave)?)
             .separator()
             .services()
             .separator()
@@ -76,13 +78,13 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             .build()?;
         menu.append_items(&[&app_menu, &file, &edit])?;
     } else {
-        menu.append_items(&[&file, &settings_menu(app, &theme)?])?;
+        menu.append_items(&[&file, &settings_menu(app, &theme, &autosave)?])?;
     }
     Ok(menu)
 }
 
-fn settings_menu(app: &AppHandle, theme: &Submenu<Wry>) -> tauri::Result<Submenu<Wry>> {
-    SubmenuBuilder::new(app, "Settings").item(theme).build()
+fn settings_menu(app: &AppHandle, theme: &Submenu<Wry>, autosave: &CheckMenuItem<Wry>) -> tauri::Result<Submenu<Wry>> {
+    SubmenuBuilder::new(app, "Settings").item(theme).item(autosave).build()
 }
 
 pub fn handle_event(app: &AppHandle, event: MenuEvent) {
@@ -97,12 +99,16 @@ pub fn handle_event(app: &AppHandle, event: MenuEvent) {
     if let Some(theme) = id.strip_prefix("theme:") {
         check_theme(app, theme);
     }
+    // Autosave's tick is set by the front end (set_menu_checked) once it has
+    // flipped and saved the setting, so the two never disagree.
     let _ = app.emit("menu", id);
 }
 
 fn check_theme(app: &AppHandle, theme: &str) {
-    for (id, item) in &app.state::<ThemeItems>().0 {
-        let _ = item.set_checked(*id == theme);
+    for (id, item) in &app.state::<CheckItems>().0 {
+        if let Some(t) = id.strip_prefix("theme:") {
+            let _ = item.set_checked(t == theme);
+        }
     }
 }
 
@@ -110,4 +116,12 @@ fn check_theme(app: &AppHandle, theme: &str) {
 #[tauri::command]
 pub fn sync_theme_menu(app: AppHandle, theme: String) {
     check_theme(&app, &theme);
+}
+
+/// Sets a check item's tick (used for Autosave).
+#[tauri::command]
+pub fn set_menu_checked(app: AppHandle, id: String, checked: bool) {
+    if let Some((_, item)) = app.state::<CheckItems>().0.iter().find(|(i, _)| *i == id) {
+        let _ = item.set_checked(checked);
+    }
 }

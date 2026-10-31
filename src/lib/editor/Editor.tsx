@@ -13,6 +13,7 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { editorTheme } from "./theme";
 import { markdownHighlighting } from "./highlight";
 import { editorCodeLanguages } from "../languages";
+import { formatKeymap } from "./format";
 
 export interface EditorHandle {
   /** A fresh state (own undo history) for a tab that isn't shown yet. */
@@ -25,7 +26,8 @@ export interface EditorHandle {
 
 interface EditorProps {
   onDocChange(text: string): void;
-  onCursor(line: number, col: number): void;
+  /** Cursor position, and how many characters are selected. */
+  onCursor(line: number, col: number, selected: number): void;
 }
 
 export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(props, ref) {
@@ -34,6 +36,13 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(prop
   // Latest callbacks, so the long-lived EditorView never calls stale closures.
   const callbacks = useRef(props);
   callbacks.current = props;
+
+  const reportCursor = (state: EditorState) => {
+    const head = state.selection.main.head;
+    const line = state.doc.lineAt(head);
+    const selected = state.selection.ranges.reduce((n, r) => n + r.to - r.from, 0);
+    callbacks.current.onCursor(line.number, head - line.from + 1, selected);
+  };
 
   const createState = (doc: string) =>
     EditorState.create({
@@ -47,15 +56,12 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(prop
         EditorView.lineWrapping,
         markdown({ base: markdownLanguage, codeLanguages: editorCodeLanguages }),
         markdownHighlighting,
-        keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
+        // Formatting first: Mod-i would otherwise select the parent syntax node.
+        keymap.of([...formatKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap]),
         editorTheme,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) callbacks.current.onDocChange(update.state.doc.toString());
-          if (update.docChanged || update.selectionSet) {
-            const head = update.state.selection.main.head;
-            const line = update.state.doc.lineAt(head);
-            callbacks.current.onCursor(line.number, head - line.from + 1);
-          }
+          if (update.docChanged || update.selectionSet) reportCursor(update.state);
         }),
       ],
     });
@@ -78,9 +84,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(prop
       v.setState(state);
       if (scroll) v.dispatch({ effects: scroll });
       v.focus();
-      const head = state.selection.main.head;
-      const line = state.doc.lineAt(head);
-      callbacks.current.onCursor(line.number, head - line.from + 1);
+      reportCursor(state);
     },
     focus: () => view.current?.focus(),
     get view() {

@@ -10,7 +10,7 @@ export const isThemeSetting = (v: unknown): v is ThemeSetting => v === "system" 
 const THEME_CACHE_KEY = "nova-md:theme";
 
 let store: Promise<Store> | null = null;
-export const settingsStore = () => (store ??= load("settings.json", { defaults: { theme: "system" }, autoSave: 200 }));
+export const settingsStore = () => (store ??= load("settings.json", { defaults: { theme: "system", autosave: true }, autoSave: 200 }));
 
 /** Applies the theme to the page and the native window chrome. */
 export function applyTheme(theme: ThemeSetting): void {
@@ -72,4 +72,20 @@ export async function syncThemeMenu(theme: ThemeSetting): Promise<void> {
 /** Writes pending changes now instead of after the auto-save delay (used on quit). */
 export async function flushSettings(): Promise<void> {
   if (isTauri()) await (await settingsStore()).save();
+}
+
+/** Save after 2 seconds without typing; on by default. */
+export async function loadAutosave(): Promise<boolean> {
+  if (!isTauri()) return true;
+  return (await (await settingsStore()).get("autosave")) !== false;
+}
+
+export async function saveAutosave(on: boolean): Promise<void> {
+  if (!isTauri()) return;
+  await (await settingsStore()).set("autosave", on);
+}
+
+/** Ticks or unticks a native check menu item, such as Settings › Autosave. */
+export async function setMenuChecked(id: string, checked: boolean): Promise<void> {
+  if (isTauri()) await invoke("set_menu_checked", { id, checked });
 }

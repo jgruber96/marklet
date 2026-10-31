@@ -333,6 +333,43 @@ button {
   margin: 0 0 6px;
 }
 
+/* Outline */
+
+.outline {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 8px;
+}
+
+.outline-item {
+  flex: none;
+  height: 26px;
+  padding-right: 10px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.outline-item:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--selected) 60%, transparent);
+}
+
+.outline-item.active {
+  color: var(--accent);
+  background: var(--selected);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.outline-blank {
+  font-style: italic;
+}
+
 .panes {
   display: flex;
   flex: 1;

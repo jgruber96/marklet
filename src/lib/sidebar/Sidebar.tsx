@@ -1,4 +1,5 @@
 import { FileTree, type FileTreeActions } from "./FileTree";
+import { Outline, type OutlineProps } from "./Outline";
 import type { TreeNode } from "../stores/workspace";
 
 interface SidebarProps extends FileTreeActions {
@@ -7,10 +8,11 @@ interface SidebarProps extends FileTreeActions {
   nodes: TreeNode[];
   expanded: Set<string>;
   activePath: string | null;
+  outline: OutlineProps;
 }
 
-/** Files above Outline. The outline lands in milestone 5. */
-export function Sidebar({ width, ...tree }: SidebarProps) {
+/** Files above Outline. */
+export function Sidebar({ width, outline, ...tree }: SidebarProps) {
   return (
     <aside className="sidebar" style={{ width }}>
       <section className="side-section side-files">
@@ -19,7 +21,7 @@ export function Sidebar({ width, ...tree }: SidebarProps) {
       </section>
       <section className="side-section">
         <h2>Outline</h2>
-        <div className="side-empty">Headings in the current file appear here.</div>
+        <Outline {...outline} />
       </section>
     </aside>
   );

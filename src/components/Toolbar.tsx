@@ -12,6 +12,7 @@ import {
   SquarePen,
 } from "lucide-react";
 import type { ViewMode } from "../lib/stores/settings";
+import type { FormatKind } from "../lib/editor/format";
 
 interface ToolbarProps {
   viewMode: ViewMode;
@@ -19,6 +20,7 @@ interface ToolbarProps {
   onNew(): void;
   onOpen(): void;
   onOpenFolder(): void;
+  onFormat(kind: FormatKind): void;
 }
 
 const viewModes: { mode: ViewMode; label: string }[] = [
@@ -30,16 +32,16 @@ const viewModes: { mode: ViewMode; label: string }[] = [
 const mod = navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl+";
 const later = (milestone: number) => `Coming in milestone ${milestone}`;
 
-const formatting = [
-  { icon: Bold, label: "Bold" },
-  { icon: Italic, label: "Italic" },
-  { icon: Heading, label: "Heading" },
-  { icon: Link, label: "Link" },
-  { icon: Code, label: "Inline code" },
-  { icon: List, label: "Bulleted list" },
+const formatting: { kind: FormatKind; icon: typeof Bold; label: string; key?: string }[] = [
+  { kind: "bold", icon: Bold, label: "Bold", key: "B" },
+  { kind: "italic", icon: Italic, label: "Italic", key: "I" },
+  { kind: "heading", icon: Heading, label: "Heading (cycles #, ##, ###)" },
+  { kind: "link", icon: Link, label: "Link", key: "K" },
+  { kind: "code", icon: Code, label: "Inline code" },
+  { kind: "bullet", icon: List, label: "Bulleted list" },
 ];
 
-export function Toolbar({ viewMode, onViewMode, onNew, onOpen, onOpenFolder }: ToolbarProps) {
+export function Toolbar({ viewMode, onViewMode, onNew, onOpen, onOpenFolder, onFormat }: ToolbarProps) {
   return (
     <div className="toolbar">
       <button className="tb-btn" onClick={onNew} title={`New (${mod}N)`}>
@@ -54,8 +56,17 @@ export function Toolbar({ viewMode, onViewMode, onNew, onOpen, onOpenFolder }: T
 
       <div className="tb-sep" />
 
-      {formatting.map(({ icon: Icon, label }) => (
-        <button key={label} className="tb-btn icon" disabled aria-label={label} title={`${label} — ${later(5)}`}>
+      {formatting.map(({ kind, icon: Icon, label, key }) => (
+        <button
+          key={kind}
+          className="tb-btn icon"
+          disabled={viewMode === "preview"}
+          aria-label={label}
+          title={key ? `${label} (${mod}${key})` : label}
+          // Keep focus (and the selection) in the editor.
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onFormat(kind)}
+        >
           <Icon size={16} />
         </button>
       ))}

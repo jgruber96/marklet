@@ -1,4 +1,4 @@
-import type { EditorView } from "@codemirror/view";
+import { EditorView } from "@codemirror/view";
 
 interface Anchor {
   /** 0-based source line, possibly fractional. */
@@ -22,16 +22,25 @@ export class ScrollSync {
   private anchors: Anchor[] | null = null;
   private enabled = true;
   private frame = 0;
+  private scrollFrame = 0;
   private readonly cleanup: (() => void)[] = [];
 
   constructor(
     private readonly view: EditorView,
     private readonly pane: HTMLElement,
     private readonly content: HTMLElement,
+    /** Called once per frame while either side scrolls (the outline tracks the heading in view). */
+    private readonly onScroll: () => void = () => {},
   ) {
     const editorEl = view.scrollDOM;
-    this.on(editorEl, "scroll", () => this.driver === "editor" && this.schedule("editor"));
-    this.on(pane, "scroll", () => this.driver === "preview" && this.schedule("preview"));
+    this.on(editorEl, "scroll", () => {
+      if (this.driver === "editor") this.schedule("editor");
+      this.notifyScroll();
+    });
+    this.on(pane, "scroll", () => {
+      if (this.driver === "preview") this.schedule("preview");
+      this.notifyScroll();
+    });
     for (const type of ["wheel", "pointerdown", "keydown", "touchstart"]) {
       this.on(view.dom, type, () => (this.driver = "editor"));
       this.on(pane, type, () => (this.driver = "preview"));
@@ -44,6 +53,7 @@ export class ScrollSync {
 
   destroy() {
     cancelAnimationFrame(this.frame);
+    cancelAnimationFrame(this.scrollFrame);
     this.cleanup.forEach((fn) => fn());
   }
 
@@ -62,6 +72,49 @@ export class ScrollSync {
   followEditor() {
     this.driver = "editor";
     this.schedule("editor");
+  }
+
+  /**
+   * Scrolls both panes so source line `line` (0-based) sits at the top, and
+   * puts the cursor there. Works in every view mode; hidden panes are skipped.
+   */
+  jumpTo(line: number) {
+    this.driver = "editor";
+    const view = this.view;
+    if (view.dom.offsetParent !== null) {
+      const pos = view.state.doc.line(Math.min(view.state.doc.lines, line + 1)).from;
+      // CodeMirror's own scroll re-measures lines it had only estimated (long
+      // wrapped lines off screen), so the heading lands exactly at the top.
+      view.dispatch({ selection: { anchor: pos }, effects: EditorView.scrollIntoView(pos, { y: "start", yMargin: 0 }) });
+      view.focus();
+    }
+    if (this.pane.offsetParent !== null) {
+      const target = [...this.content.querySelectorAll<HTMLElement>("[data-line]")].find(
+        (el) => Number(el.dataset.line) >= line && el.offsetParent !== null,
+      );
+      if (target) {
+        const top = target.getBoundingClientRect().top - this.content.getBoundingClientRect().top;
+        this.pane.scrollTop = this.contentOffset() + top;
+      }
+    }
+  }
+
+  /** The source line (0-based, fractional) at the top of whichever pane is showing; the editor wins in split view. */
+  topLine(): number {
+    if (this.view.dom.offsetParent !== null) return this.editorTopLine();
+    const y = this.pane.scrollTop - this.contentOffset();
+    const anchors = this.getAnchors();
+    let i = 0;
+    while (i < anchors.length - 2 && anchors[i + 1].top <= y) i++;
+    const a = anchors[i];
+    const b = anchors[i + 1] ?? a;
+    const t = b.top > a.top ? (y - a.top) / (b.top - a.top) : 0;
+    return a.line + Math.min(1, Math.max(0, t)) * (b.line - a.line);
+  }
+
+  private notifyScroll() {
+    cancelAnimationFrame(this.scrollFrame);
+    this.scrollFrame = requestAnimationFrame(() => this.onScroll());
   }
 
   private invalidate() {
