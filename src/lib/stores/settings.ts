@@ -8,9 +8,10 @@ export const isThemeSetting = (v: unknown): v is ThemeSetting => v === "system" 
 // Mirror of the theme in localStorage so it can be applied before first paint;
 // settings.json (tauri-plugin-store) stays the source of truth.
 const THEME_CACHE_KEY = "nova-md:theme";
+const ACCENT_CACHE_KEY = "nova-md:accent";
 
 let store: Promise<Store> | null = null;
-export const settingsStore = () => (store ??= load("settings.json", { defaults: { theme: "system", autosave: true }, autoSave: 200 }));
+export const settingsStore = () => (store ??= load("settings.json", { defaults: { theme: "system", accent: "blue", autosave: true }, autoSave: 200 }));
 
 /** Applies the theme to the page and the native window chrome. */
 export function applyTheme(theme: ThemeSetting): void {
@@ -66,7 +67,7 @@ export async function saveViewMode(mode: ViewMode): Promise<void> {
 
 /** Ticks the matching item in Settings › Theme. */
 export async function syncThemeMenu(theme: ThemeSetting): Promise<void> {
-  if (isTauri()) await invoke("sync_theme_menu", { theme });
+  await checkMenuGroup("theme", theme);
 }
 
 /** Writes pending changes now instead of after the auto-save delay (used on quit). */
@@ -88,4 +89,47 @@ export async function saveAutosave(on: boolean): Promise<void> {
 /** Ticks or unticks a native check menu item, such as Settings › Autosave. */
 export async function setMenuChecked(id: string, checked: boolean): Promise<void> {
   if (isTauri()) await invoke("set_menu_checked", { id, checked });
+}
+
+/** Accent presets; the values live in theme.css. Blue is the brief's default. */
+export const ACCENTS = ["blue", "purple", "green", "orange", "pink", "teal"] as const;
+export type AccentSetting = (typeof ACCENTS)[number];
+export const isAccentSetting = (v: unknown): v is AccentSetting => ACCENTS.includes(v as AccentSetting);
+
+export function applyAccent(accent: AccentSetting): void {
+  const root = document.documentElement;
+  if (accent === "blue") delete root.dataset.accent;
+  else root.dataset.accent = accent;
+  try {
+    localStorage.setItem(ACCENT_CACHE_KEY, accent);
+  } catch {
+    // Cache only; the store still has it.
+  }
+}
+
+/** Synchronous best guess for first paint. */
+export function cachedAccent(): AccentSetting {
+  try {
+    const v = localStorage.getItem(ACCENT_CACHE_KEY);
+    if (isAccentSetting(v)) return v;
+  } catch {
+    // Fall through to the default.
+  }
+  return "blue";
+}
+
+export async function loadAccent(): Promise<AccentSetting> {
+  if (!isTauri()) return cachedAccent();
+  const v = await (await settingsStore()).get("accent");
+  return isAccentSetting(v) ? v : "blue";
+}
+
+export async function saveAccent(accent: AccentSetting): Promise<void> {
+  if (!isTauri()) return;
+  await (await settingsStore()).set("accent", accent);
+}
+
+/** Ticks one item of a radio-style menu group such as `accent:*`. */
+export async function checkMenuGroup(group: string, value: string): Promise<void> {
+  if (isTauri()) await invoke("check_menu_group", { group, value });
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { isTauri } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask } from "@tauri-apps/plugin-dialog";
@@ -34,7 +34,14 @@ import {
   saveViewMode,
   setMenuChecked,
   syncThemeMenu,
+  type AccentSetting,
+  applyAccent,
+  checkMenuGroup,
+  isAccentSetting,
+  loadAccent,
+  saveAccent,
 } from "./lib/stores/settings";
+import { type ExportKind, buildHtml, pdfNeedsPath, pickExportPath, printPdf, writeHtml } from "./lib/export/export";
 import {
   type TreeNode,
   confirmTrash,
@@ -421,12 +428,46 @@ export default function App() {
 
   const setViewMode = (mode: ViewMode) => {
     setViewModeState(mode);
+    void checkMenuGroup("view", mode);
     void saveViewMode(mode);
   };
 
-  const setTheme = async (theme: ThemeSetting) => {
-    applyTheme(theme);
-    await saveTheme(theme);
+  // Current appearance settings, for exports.
+  const theme = useRef<ThemeSetting>("system");
+  const accent = useRef<AccentSetting>("blue");
+
+  const setTheme = async (value: ThemeSetting) => {
+    theme.current = value;
+    applyTheme(value);
+    await saveTheme(value);
+  };
+
+  const setAccent = async (value: AccentSetting) => {
+    accent.current = value;
+    applyAccent(value);
+    void checkMenuGroup("accent", value);
+    await saveAccent(value);
+  };
+
+  // ---- Export ----
+
+  const exportAs = async (kind: ExportKind) => {
+    const tab = activeTab();
+    if (!tab) return;
+    const name = docName(tab.doc);
+    try {
+      if (kind === "html") {
+        const path = await pickExportPath("html", tab.doc.path, name);
+        if (!path) return;
+        await writeHtml(path, await buildHtml(textOf(tab), dirOf(tab.doc.path), name, theme.current, accent.current));
+      } else {
+        const path = pdfNeedsPath ? await pickExportPath("pdf", tab.doc.path, name) : null;
+        if (pdfNeedsPath && !path) return;
+        await printPdf(path, name);
+      }
+    } catch (err) {
+      await showError(err);
+    }
   };
 
   const withActive = (fn: (tab: Tab) => Promise<unknown>) => async () => {
@@ -451,11 +492,17 @@ export default function App() {
     "close-tab": async () => closeTab(activeId.current),
     "next-tab": async () => cycleTab(1),
     "prev-tab": async () => cycleTab(-1),
+    "export-html": () => exportAs("html"),
+    "export-pdf": () => exportAs("pdf"),
   };
 
   // Latest handlers for listeners registered once.
-  const actions = useRef({ commands, onFsChange, setTheme, setAutosave, confirmDiscard });
-  actions.current = { commands, onFsChange, setTheme, setAutosave, confirmDiscard };
+  const openFiles = async (paths: string[]) => {
+    for (const path of paths) await openPath(path);
+  };
+
+  const actions = useRef({ commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, confirmDiscard, openFiles });
+  actions.current = { commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, confirmDiscard, openFiles };
 
   // Serialize file actions so a second trigger can't open a second dialog. A
   // shortcut can arrive both as a keydown and as a menu accelerator, so the
@@ -492,10 +539,15 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
       const key = e.key.toLowerCase();
+      const view = !e.shiftKey && ({ "1": "editor", "2": "split", "3": "preview" } as Record<string, ViewMode>)[e.key];
+      if (view) {
+        e.preventDefault();
+        return actions.current.setViewMode(view);
+      }
       let id: string | null;
       if (key === "tab" && e.ctrlKey) id = e.shiftKey ? "prev-tab" : "next-tab";
-      else if (e.shiftKey) id = ({ s: "save-as", o: "open-folder" } as Record<string, string>)[key] ?? null;
-      else id = ({ n: "new", o: "open", s: "save", w: "close-tab" } as Record<string, string>)[key] ?? null;
+      else if (e.shiftKey) id = ({ s: "save-as", o: "open-folder", e: "export-html" } as Record<string, string>)[key] ?? null;
+      else id = ({ n: "new", o: "open", s: "save", w: "close-tab", p: "export-pdf" } as Record<string, string>)[key] ?? null;
       if (!id) return;
       e.preventDefault();
       run(id);
@@ -508,27 +560,41 @@ export default function App() {
   useEffect(() => {
     if (!isTauri()) return;
     const unlisten = listen<string>("menu", ({ payload: id }) => {
-      const theme = id.startsWith("theme:") ? id.slice("theme:".length) : null;
+      const [group, value] = id.split(":");
       // Settings apply right away, even while a dialog holds the file-action lock.
-      if (isThemeSetting(theme)) void actions.current.setTheme(theme);
+      if (group === "theme" && isThemeSetting(value)) void actions.current.setTheme(value);
+      else if (group === "accent" && isAccentSetting(value)) void actions.current.setAccent(value);
+      else if (group === "view" && (value === "editor" || value === "split" || value === "preview")) actions.current.setViewMode(value);
       else if (id === "autosave") void actions.current.setAutosave(!autosaveOn.current);
       else run(id);
     });
     const unwatch = listen<string[]>("fs-change", ({ payload }) => actions.current.onFsChange(payload));
+    // Files double-clicked in Explorer or Finder while the app is running.
+    const unopen = listen<string[]>("open-files", ({ payload }) => void exclusive(() => actions.current.openFiles(payload), true));
     return () => {
       void unlisten.then((fn) => fn());
       void unwatch.then((fn) => fn());
+      void unopen.then((fn) => fn());
     };
   }, []);
 
   // Startup: settings, then the last session's folder and tabs.
   const started = useRef(false);
   useEffect(() => {
-    void loadTheme().then((theme) => {
-      applyTheme(theme);
-      void syncThemeMenu(theme);
+    void loadTheme().then((value) => {
+      theme.current = value;
+      applyTheme(value);
+      void syncThemeMenu(value);
     });
-    void loadViewMode().then(setViewModeState);
+    void loadAccent().then((value) => {
+      accent.current = value;
+      applyAccent(value);
+      void checkMenuGroup("accent", value);
+    });
+    void loadViewMode().then((mode) => {
+      setViewModeState(mode);
+      void checkMenuGroup("view", mode);
+    });
     void loadAutosave().then((on) => {
       autosaveOn.current = on;
       setAutosaveState(on);
@@ -551,6 +617,8 @@ export default function App() {
       const front = session.files[session.active];
       if (opened.length === 0) addTab(untitledDoc(), "");
       else show((opened.find((t) => front && samePath(t.doc.path!, front)) ?? opened[opened.length - 1]).id);
+      // A file the app was launched to open (double-click) comes to the front.
+      if (isTauri()) await openFiles(await invoke<string[]>("take_launch_files"));
     });
   }, []);
 
@@ -613,6 +681,7 @@ export default function App() {
         onOpen={() => run("open")}
         onOpenFolder={() => run("open-folder")}
         onFormat={format}
+        onExport={(kind) => run(`export-${kind}`)}
       />
       <TabStrip
         tabs={tabs.current.map((t) => ({ id: t.id, name: docName(t.doc), title: t.doc.path ?? docName(t.doc), dirty: t.dirty }))}
@@ -636,6 +705,7 @@ export default function App() {
           onRename={(path, newName) => renameEntry(path, newName)}
           onDelete={(node) => void exclusive(() => deleteEntry(node))}
           onReveal={(path) => void revealItemInDir(path)}
+          onEscape={() => editor.current?.focus()}
           outline={{ source, topLine: outlineTopLine, onScroll: onOutlineScroll, onJump: jumpToLine }}
         />
         <Splitter label="Resize sidebar" onDrag={(x) => setSidebarWidth(clamp(x, SIDEBAR_MIN, SIDEBAR_MAX))} />

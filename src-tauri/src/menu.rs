@@ -1,12 +1,29 @@
-//! Native menu bar. File actions are forwarded to the front end as a `menu`
-//! event carrying the item id; the front end owns documents and dialogs.
+//! Native menu bar. Items are forwarded to the front end as a `menu` event
+//! carrying the item id; the front end owns documents, dialogs and settings.
 
-use tauri::menu::{CheckMenuItem, CheckMenuItemBuilder, Menu, MenuEvent, MenuItemBuilder, Submenu, SubmenuBuilder};
+use tauri::menu::{CheckMenuItem, CheckMenuItemBuilder, Menu, MenuEvent, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, Wry};
 
 const THEMES: [(&str, &str); 3] = [("system", "System"), ("light", "Light"), ("dark", "Dark")];
+const ACCENTS: [(&str, &str); 6] = [
+    ("blue", "Blue"),
+    ("purple", "Purple"),
+    ("green", "Green"),
+    ("orange", "Orange"),
+    ("pink", "Pink"),
+    ("teal", "Teal"),
+];
+const VIEWS: [(&str, &str, &str); 3] = [
+    ("editor", "Editor Only", "CmdOrCtrl+1"),
+    ("split", "Split", "CmdOrCtrl+2"),
+    ("preview", "Preview Only", "CmdOrCtrl+3"),
+];
 
-/// Check items by id (`theme:*`, `autosave`), so their ticks can follow the front end's settings.
+/// Groups whose check items behave like radio buttons: `group:value` ids.
+const RADIO_GROUPS: [&str; 3] = ["theme", "accent", "view"];
+
+/// Check items by id (`theme:dark`, `accent:blue`, `view:split`, `autosave`),
+/// so their ticks can follow the front end's settings.
 pub struct CheckItems(Vec<(String, CheckMenuItem<Wry>)>);
 
 pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
@@ -16,6 +33,17 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             Some(a) => b.accelerator(a).build(app),
             None => b.build(app),
         }
+    };
+    let mut checks = Vec::new();
+    let mut radio = |group: &str, value: &str, label: &str, accel: Option<&str>, on: bool| {
+        let id = format!("{group}:{value}");
+        let mut b = CheckMenuItemBuilder::with_id(&id, label).checked(on);
+        if let Some(a) = accel {
+            b = b.accelerator(a);
+        }
+        let check = b.build(app)?;
+        checks.push((id, check.clone()));
+        Ok::<_, tauri::Error>(check)
     };
 
     let quit_label = if cfg!(target_os = "macos") { "Quit Nova MD" } else { "Exit" };
@@ -30,25 +58,37 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .item(&item("save", "Save", Some("CmdOrCtrl+S"))?)
         .item(&item("save-as", "Save As…", Some("CmdOrCtrl+Shift+S"))?)
         .separator()
+        .item(&item("export-html", "Export as HTML…", Some("CmdOrCtrl+Shift+E"))?)
+        .item(&item("export-pdf", "Export as PDF…", Some("CmdOrCtrl+P"))?)
+        .separator()
         .item(&item("close-tab", "Close Tab", Some("CmdOrCtrl+W"))?);
     if !cfg!(target_os = "macos") {
         file = file.separator().item(&item("quit", quit_label, quit_accel)?);
     }
     let file = file.build()?;
 
-    let mut check_items = Vec::new();
+    let mut view = SubmenuBuilder::new(app, "View");
+    for (value, label, accel) in VIEWS {
+        view = view.item(&radio("view", value, label, Some(accel), value == "split")?);
+    }
+    let view = view.build()?;
+
     let mut theme = SubmenuBuilder::new(app, "Theme");
-    for (id, label) in THEMES {
-        let check = CheckMenuItemBuilder::with_id(format!("theme:{id}"), label)
-            .checked(id == "system")
-            .build(app)?;
-        theme = theme.item(&check);
-        check_items.push((format!("theme:{id}"), check));
+    for (value, label) in THEMES {
+        theme = theme.item(&radio("theme", value, label, None, value == "system")?);
     }
     let theme = theme.build()?;
+
+    let mut accent = SubmenuBuilder::new(app, "Accent Color");
+    for (value, label) in ACCENTS {
+        accent = accent.item(&radio("accent", value, label, None, value == "blue")?);
+    }
+    let accent = accent.build()?;
+
     let autosave = CheckMenuItemBuilder::with_id("autosave", "Autosave").checked(true).build(app)?;
-    check_items.push(("autosave".into(), autosave.clone()));
-    app.manage(CheckItems(check_items));
+    checks.push(("autosave".into(), autosave.clone()));
+    app.manage(CheckItems(checks));
+    let settings = SubmenuBuilder::new(app, "Settings").item(&theme).item(&accent).item(&autosave).build()?;
 
     let menu = Menu::new(app)?;
     if cfg!(target_os = "macos") {
@@ -57,7 +97,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         let app_menu = SubmenuBuilder::new(app, "Nova MD")
             .about(None)
             .separator()
-            .item(&settings_menu(app, &theme, &autosave)?)
+            .item(&settings)
             .separator()
             .services()
             .separator()
@@ -76,15 +116,11 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             .paste()
             .select_all()
             .build()?;
-        menu.append_items(&[&app_menu, &file, &edit])?;
+        menu.append_items(&[&app_menu, &file, &edit, &view])?;
     } else {
-        menu.append_items(&[&file, &settings_menu(app, &theme, &autosave)?])?;
+        menu.append_items(&[&file, &view, &settings])?;
     }
     Ok(menu)
-}
-
-fn settings_menu(app: &AppHandle, theme: &Submenu<Wry>, autosave: &CheckMenuItem<Wry>) -> tauri::Result<Submenu<Wry>> {
-    SubmenuBuilder::new(app, "Settings").item(theme).item(autosave).build()
 }
 
 pub fn handle_event(app: &AppHandle, event: MenuEvent) {
@@ -96,26 +132,31 @@ pub fn handle_event(app: &AppHandle, event: MenuEvent) {
         }
         return;
     }
-    if let Some(theme) = id.strip_prefix("theme:") {
-        check_theme(app, theme);
+    // Clicking a check item only toggles that item; keep its group to one tick.
+    if let Some((group, value)) = id.split_once(':') {
+        if RADIO_GROUPS.contains(&group) {
+            check_group(app, group, value);
+        }
     }
     // Autosave's tick is set by the front end (set_menu_checked) once it has
     // flipped and saved the setting, so the two never disagree.
     let _ = app.emit("menu", id);
 }
 
-fn check_theme(app: &AppHandle, theme: &str) {
+fn check_group(app: &AppHandle, group: &str, value: &str) {
     for (id, item) in &app.state::<CheckItems>().0 {
-        if let Some(t) = id.strip_prefix("theme:") {
-            let _ = item.set_checked(t == theme);
+        if let Some((g, v)) = id.split_once(':') {
+            if g == group {
+                let _ = item.set_checked(v == value);
+            }
         }
     }
 }
 
-/// Lets the front end tick the saved theme at startup.
+/// Ticks `group:value` and unticks the rest of the group (theme, accent, view).
 #[tauri::command]
-pub fn sync_theme_menu(app: AppHandle, theme: String) {
-    check_theme(&app, &theme);
+pub fn check_menu_group(app: AppHandle, group: String, value: String) {
+    check_group(&app, &group, &value);
 }
 
 /// Sets a check item's tick (used for Autosave).

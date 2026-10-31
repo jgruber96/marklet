@@ -2,6 +2,7 @@
  * Nova MD design tokens — the single source for the editor, preview and export.
  * Light is the default; dark applies when the OS prefers it, unless the
  * <html data-theme="light"> override is set, or always with data-theme="dark".
+ * <html data-accent> picks an accent preset; blue is the default.
  */
 
 :root {
@@ -12,7 +13,10 @@
   --border: #e3e5e8;
   --text: #1f2328;
   --muted: #57606a;
-  --accent: #2f6feb;
+  /* Accent pairs; Settings › Accent Color swaps them (presets below). */
+  --accent-light: #2f6feb;
+  --accent-dark: #6ea2ff;
+  --accent: var(--accent-light);
   --selected: #e8eef9;
   --code-bg: #f6f8fa;
   --current-line: #eef3fd;
@@ -37,7 +41,7 @@
     --border: #2e3238;
     --text: #e6e8eb;
     --muted: #a0a7b1;
-    --accent: #6ea2ff;
+    --accent: var(--accent-dark);
     --selected: #2a2f37;
     --code-bg: #111316;
     --current-line: #232830;
@@ -58,7 +62,7 @@
   --border: #2e3238;
   --text: #e6e8eb;
   --muted: #a0a7b1;
-  --accent: #6ea2ff;
+  --accent: var(--accent-dark);
   --selected: #2a2f37;
   --code-bg: #111316;
   --current-line: #232830;
@@ -68,4 +72,30 @@
   --tok-function: #d2a8ff;
   --tok-comment: #8b949e;
   --tok-number: #79c0ff;
+}
+
+/* Accent presets: a light and a dark shade of each, both readable on --bg. */
+:root[data-accent="purple"] {
+  --accent-light: #8250df;
+  --accent-dark: #b392f0;
+}
+
+:root[data-accent="green"] {
+  --accent-light: #1a7f37;
+  --accent-dark: #3fb950;
+}
+
+:root[data-accent="orange"] {
+  --accent-light: #bc4c00;
+  --accent-dark: #f0883e;
+}
+
+:root[data-accent="pink"] {
+  --accent-light: #bf3989;
+  --accent-dark: #f778ba;
+}
+
+:root[data-accent="teal"] {
+  --accent-light: #0f7b8a;
+  --accent-dark: #39c5cf;
 }

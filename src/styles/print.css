@@ -1,0 +1,95 @@
+/*
+ * PDF export: the web view prints itself, so this hides everything but the
+ * rendered preview and lays it out as pages. Always printed in the light
+ * palette, whatever the window's theme.
+ */
+
+@media print {
+  :root:root:root {
+    color-scheme: light;
+
+    --bg: #ffffff;
+    --bar: #f6f7f9;
+    --border: #e3e5e8;
+    --text: #1f2328;
+    --muted: #57606a;
+    --accent: var(--accent-light);
+    --selected: #e8eef9;
+    --code-bg: #f6f8fa;
+    --current-line: #eef3fd;
+
+    --tok-keyword: #cf222e;
+    --tok-string: #0a3069;
+    --tok-function: #8250df;
+    --tok-comment: #6e7781;
+    --tok-number: #0550ae;
+  }
+
+  @page {
+    size: auto;
+  }
+
+  html,
+  body,
+  #root,
+  .app,
+  .body,
+  .panes {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  .toolbar,
+  .tabstrip,
+  .sidebar,
+  .splitter,
+  .pane-editor,
+  .statusbar {
+    display: none !important;
+  }
+
+  /* Shown even in Editor-only view, where it is normally hidden. */
+  .pane-preview {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .markdown-body {
+    max-width: none;
+    padding: 0;
+    font-size: 11pt;
+  }
+
+  .markdown-body * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .markdown-body .code-copy {
+    display: none !important;
+  }
+
+  .markdown-body pre,
+  .markdown-body blockquote,
+  .markdown-body table,
+  .markdown-body img,
+  .markdown-body .code-block {
+    break-inside: avoid;
+  }
+
+  .markdown-body h1,
+  .markdown-body h2,
+  .markdown-body h3,
+  .markdown-body h4,
+  .markdown-body h5,
+  .markdown-body h6 {
+    break-after: avoid;
+  }
+
+  .markdown-body pre {
+    white-space: pre-wrap;
+  }
+}

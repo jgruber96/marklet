@@ -21,6 +21,12 @@ button {
   color: inherit;
 }
 
+/* Keyboard focus: a visible ring on every control, never on mouse clicks. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .app {
   display: flex;
   flex-direction: column;
@@ -358,6 +364,10 @@ button {
 .outline-item:hover {
   color: var(--text);
   background: color-mix(in srgb, var(--selected) 60%, transparent);
+}
+
+.outline-item:focus-visible {
+  color: var(--text);
 }
 
 .outline-item.active {

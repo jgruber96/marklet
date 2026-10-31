@@ -1,5 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { findHeadings } from "./headings";
+import { moveFocus, syncTabStop } from "./roving";
 
 export interface OutlineProps {
   source: string;
@@ -36,6 +37,9 @@ export function Outline({ source, topLine, onScroll, onJump }: OutlineProps) {
     list.current?.querySelector(".outline-item.active")?.scrollIntoView({ block: "nearest" });
   }, [active]);
 
+  // One tab stop for the outline: the heading in view; arrows move between headings.
+  useEffect(() => syncTabStop(list.current, ".outline-item", ".outline-item.active"));
+
   if (headings.length === 0) return <div className="side-empty">Headings in the current file appear here.</div>;
 
   return (
@@ -47,7 +51,9 @@ export function Outline({ source, topLine, onScroll, onJump }: OutlineProps) {
           className={`outline-item${i === active ? " active" : ""}`}
           style={{ paddingLeft: 14 + (h.level - minLevel) * INDENT }}
           title={h.text}
+          tabIndex={-1}
           onClick={() => onJump(h.line)}
+          onKeyDown={(e) => moveFocus(e, list.current, ".outline-item")}
         >
           {h.text || <span className="outline-blank">(empty heading)</span>}
         </button>

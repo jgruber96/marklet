@@ -19,3 +19,10 @@ tauri-plugin-clipboard-manager = "2"
 notify-debouncer-mini = "0.7.0"
 trash = "5.2.9"
 tauri-plugin-window-state = "2.5.0"
+base64 = "0.22"
+tauri-plugin-single-instance = "2.5.5"
+
+[target.'cfg(windows)'.dependencies]
+# Same versions Tauri's wry uses, for WebView2's PrintToPdf.
+webview2-com = "0.39"
+windows = "0.62"

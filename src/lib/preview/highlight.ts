@@ -100,9 +100,10 @@ function start(): Promise<HighlighterCore> {
   return starting;
 }
 
-function load(tag: string) {
+function load(tag: string): Promise<void> | undefined {
   const lang = languageForTag(tag);
-  if (!lang || loading.has(lang.label)) return;
+  if (!lang) return;
+  if (loading.has(lang.label)) return loading.get(lang.label);
   const done = Promise.all([start(), lang.preview()])
     .then(async ([h, grammars]) => {
       await h.loadLanguage(...grammars);
@@ -111,6 +112,12 @@ function load(tag: string) {
     })
     .catch((err) => console.error(`Could not load ${lang.label} highlighting`, err));
   loading.set(lang.label, done);
+  return done;
+}
+
+/** Resolves once every grammar requested so far has loaded (export renders, waits, renders again). */
+export async function highlightingIdle(): Promise<void> {
+  await Promise.all(loading.values());
 }
 
 const cache = new Map<string, string>();

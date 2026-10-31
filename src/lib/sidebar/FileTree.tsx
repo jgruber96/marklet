@@ -4,6 +4,7 @@ import { Menu } from "@tauri-apps/api/menu";
 import { ChevronDown, ChevronRight, FilePlus, FileText } from "lucide-react";
 import type { TreeNode } from "../stores/workspace";
 import { baseName, samePath } from "../paths";
+import { focusRow, moveFocus, syncTabStop } from "./roving";
 
 export interface FileTreeActions {
   onOpenFile(path: string): void;
@@ -28,10 +29,15 @@ type Editing = { kind: "new"; dir: string } | { kind: "rename"; path: string };
 
 const revealLabel = navigator.userAgent.includes("Mac") ? "Reveal in Finder" : "Show in Explorer";
 const INDENT = 14;
+const ROW = '.tree-row[role="treeitem"]';
 
 export function FileTree(props: FileTreeProps) {
   const { root, nodes, expanded, activePath } = props;
   const [editing, setEditing] = useState<Editing | null>(null);
+  const tree = useRef<HTMLDivElement>(null);
+
+  // One tab stop for the whole tree: the open file's row, else the first row.
+  useEffect(() => syncTabStop(tree.current, ROW, `${ROW}.active`));
 
   if (!root) {
     return (
@@ -72,7 +78,22 @@ export function FileTree(props: FileTreeProps) {
   };
 
   const onRowKey = (e: KeyboardEvent, node: TreeNode) => {
-    if (e.key === "F2") setEditing({ kind: "rename", path: node.path });
+    if (moveFocus(e, tree.current, ROW)) return;
+    const row = e.currentTarget as HTMLElement;
+    const open = node.isDir && expanded.has(node.path);
+    if (e.key === "ArrowRight" && node.isDir) {
+      const rows = [...tree.current!.querySelectorAll<HTMLElement>(ROW)];
+      const next = rows[rows.indexOf(row) + 1];
+      if (!open) props.onToggle(node.path);
+      else if (next) focusRow(rows, next); // into the folder's first entry
+    } else if (e.key === "ArrowLeft") {
+      if (open) props.onToggle(node.path);
+      else {
+        // To the folder that contains this row.
+        const parentRow = row.parentElement?.parentElement?.closest('[role="group"]')?.firstElementChild;
+        if (parentRow instanceof HTMLElement) focusRow([...tree.current!.querySelectorAll<HTMLElement>(ROW)], parentRow);
+      }
+    } else if (e.key === "F2") setEditing({ kind: "rename", path: node.path });
     else if (e.key === "Delete" || (e.key === "Backspace" && e.metaKey)) props.onDelete(node);
     else if (e.key === "Enter") node.isDir ? props.onToggle(node.path) : props.onOpenFile(node.path);
     else return;
@@ -114,7 +135,7 @@ export function FileTree(props: FileTreeProps) {
             role="treeitem"
             aria-expanded={node.isDir ? open : undefined}
             aria-selected={active}
-            tabIndex={0}
+            tabIndex={-1}
             className={`tree-row${active ? " active" : ""}`}
             style={{ paddingLeft: 8 + depth * INDENT }}
             title={node.path}
@@ -140,7 +161,7 @@ export function FileTree(props: FileTreeProps) {
     });
 
   return (
-    <div className="tree" role="tree" aria-label="Files" onContextMenu={(e) => showMenu(e, null)}>
+    <div className="tree" role="tree" aria-label="Files" ref={tree} onContextMenu={(e) => showMenu(e, null)}>
       <div className="tree-root" title={root}>
         <span className="tree-name">{baseName(root)}</span>
         <button className="icon-btn" onClick={() => startNew(root)} aria-label="New file" title="New file">

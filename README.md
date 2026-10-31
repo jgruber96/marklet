@@ -22,6 +22,41 @@ npm run tauri dev
 npm run tauri build
 ```
 
+Each platform builds its own installers: on Windows, an `.msi` and an NSIS `.exe` under `src-tauri/target/release/bundle/`; on macOS, a `.dmg` for Apple Silicon:
+
+```bash
+npm run tauri build -- --target aarch64-apple-darwin
+```
+
+Builds are unsigned, so Windows SmartScreen and macOS Gatekeeper warn on first launch. Both register `.md` and `.markdown` files to open in Nova MD.
+
+## Keyboard shortcuts
+
+Ctrl on Windows, Cmd on macOS.
+
+| Action | Shortcut |
+| --- | --- |
+| New / Open / Open Folder | Ctrl+N / Ctrl+O / Ctrl+Shift+O |
+| Save / Save As | Ctrl+S / Ctrl+Shift+S |
+| Close tab / next tab / previous tab | Ctrl+W / Ctrl+Tab / Ctrl+Shift+Tab |
+| Export as HTML / PDF | Ctrl+Shift+E / Ctrl+P |
+| Editor only / Split / Preview only | Ctrl+1 / Ctrl+2 / Ctrl+3 |
+| Bold / Italic / Link | Ctrl+B / Ctrl+I / Ctrl+K |
+| Move focus out of the editor | Esc, then Tab |
+| Back to the editor from the sidebar | Esc |
+| File tree | Arrows to move and open or close folders, Enter to open, F2 to rename, Delete to delete |
+
+## macOS test checklist
+
+Not yet run on a Mac. On macOS 13+ (Apple Silicon), check:
+
+- [ ] The app menu holds Settings (Theme, Accent Color, Autosave) and Quit; Cmd+C/V/X/Z work in the editor
+- [ ] Open Folder, tree new/rename/delete (to the Trash), and outside edits appearing without a restart
+- [ ] Closing an unsaved tab and quitting with Cmd+Q both ask to save
+- [ ] Export as PDF opens the print dialog; its PDF button saves a light-themed copy of the preview
+- [ ] Export as HTML opens in Safari looking like the preview
+- [ ] Double-clicking a `.md` file in Finder opens it, both when Nova MD is closed and when it is running
+
 ## Status
 
 - [x] 1. Shell and editor: five-band layout, theme tokens, single-file open/save
@@ -29,4 +64,4 @@ npm run tauri build
 - [x] 3. Highlighting: Markdown styles and fenced-code packs in the editor, Shiki in the preview
 - [x] 4. Workspace and tabs: folder tree with new/rename/delete, folder watcher, multiple tabs, session and window-size restore
 - [x] 5. Outline, toolbar and status bar: outline with jump and in-view highlight, formatting buttons and Ctrl/Cmd+B/I/K, autosave setting, status bar
-- [ ] 6. Export and polish
+- [x] 6. Export and polish: HTML and PDF export, theme and accent settings, View menu, keyboard pass, file associations (tested on Windows; macOS checklist above)

@@ -9,12 +9,20 @@ interface SidebarProps extends FileTreeActions {
   expanded: Set<string>;
   activePath: string | null;
   outline: OutlineProps;
+  /** Escape in the sidebar goes back to the editor. */
+  onEscape(): void;
 }
 
 /** Files above Outline. */
-export function Sidebar({ width, outline, ...tree }: SidebarProps) {
+export function Sidebar({ width, outline, onEscape, ...tree }: SidebarProps) {
   return (
-    <aside className="sidebar" style={{ width }}>
+    <aside
+      className="sidebar"
+      style={{ width }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onEscape();
+      }}
+    >
       <section className="side-section side-files">
         <h2>Files</h2>
         <FileTree {...tree} />
