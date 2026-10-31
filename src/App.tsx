@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Editor, type EditorHandle } from "./lib/editor/Editor";
 import { Sidebar } from "./lib/sidebar/Sidebar";
@@ -15,6 +16,14 @@ import {
   untitledDoc,
   writeDoc,
 } from "./lib/stores/document";
+import {
+  type ThemeSetting,
+  applyTheme,
+  isThemeSetting,
+  loadTheme,
+  saveTheme,
+  syncThemeMenu,
+} from "./lib/stores/settings";
 import { Toolbar } from "./components/Toolbar";
 import { TabStrip } from "./components/TabStrip";
 import { StatusBar } from "./components/StatusBar";
@@ -53,9 +62,9 @@ export default function App() {
   };
 
   /** Saves the current document; returns false if the user cancelled the save dialog. */
-  const save = async (): Promise<boolean> => {
+  const save = async (askForPath = false): Promise<boolean> => {
     const current = docRef.current;
-    const path = current.path ?? (await pickSavePath(current));
+    const path = (!askForPath && current.path) || (await pickSavePath(current));
     if (!path) return false;
     const text = textRef.current;
     try {
@@ -93,14 +102,34 @@ export default function App() {
     }
   };
 
-  // Latest handlers for listeners registered once.
-  const actions = useRef({ save, newFile, openFile, confirmDiscard });
-  actions.current = { save, newFile, openFile, confirmDiscard };
+  const setTheme = async (theme: ThemeSetting) => {
+    applyTheme(theme);
+    await saveTheme(theme);
+  };
 
-  // Serialize file actions so a second shortcut can't open a second dialog.
+  /** Commands shared by the File menu, the toolbar, the tab strip and shortcuts. */
+  const commands: Record<string, () => Promise<unknown>> = {
+    new: newFile,
+    open: openFile,
+    save: () => save(),
+    "save-as": () => save(true),
+    "close-tab": newFile, // single tab until milestone 4: closing leaves an empty Untitled
+  };
+
+  // Latest handlers for listeners registered once.
+  const actions = useRef({ commands, confirmDiscard, setTheme });
+  actions.current = { commands, confirmDiscard, setTheme };
+
+  // Serialize file actions so a second trigger can't open a second dialog. A
+  // shortcut can arrive both as a keydown and as a menu accelerator, so the
+  // same command repeated within a moment is dropped.
   const busy = useRef(false);
-  const run = async (action: () => Promise<unknown>) => {
-    if (busy.current) return;
+  const last = useRef({ id: "", at: 0 });
+  const run = async (id: string) => {
+    const action = actions.current.commands[id];
+    const now = performance.now();
+    if (!action || busy.current || (last.current.id === id && now - last.current.at < 400)) return;
+    last.current = { id, at: now };
     busy.current = true;
     try {
       await action();
@@ -112,16 +141,37 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
       const key = e.key.toLowerCase();
-      const action =
-        key === "s" ? actions.current.save : key === "o" ? actions.current.openFile : key === "n" ? actions.current.newFile : null;
-      if (!action) return;
+      const id = e.shiftKey
+        ? key === "s" ? "save-as" : null
+        : ({ n: "new", o: "open", s: "save", w: "close-tab" } as Record<string, string>)[key] ?? null;
+      if (!id) return;
       e.preventDefault();
-      void run(action);
+      void run(id);
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
+  }, []);
+
+  // Native menu items arrive as a "menu" event carrying the item id.
+  useEffect(() => {
+    if (!isTauri()) return;
+    const unlisten = listen<string>("menu", ({ payload: id }) => {
+      const theme = id.startsWith("theme:") ? id.slice("theme:".length) : null;
+      if (isThemeSetting(theme)) void actions.current.setTheme(theme);
+      else void run(id);
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  useEffect(() => {
+    void loadTheme().then((theme) => {
+      applyTheme(theme);
+      void syncThemeMenu(theme);
+    });
   }, []);
 
   useEffect(() => {
@@ -146,8 +196,8 @@ export default function App() {
 
   return (
     <div className="app">
-      <Toolbar onNew={() => run(newFile)} onOpen={() => run(openFile)} />
-      <TabStrip name={name} dirty={dirty} onClose={() => run(newFile)} onNew={() => run(newFile)} />
+      <Toolbar onNew={() => run("new")} onOpen={() => run("open")} />
+      <TabStrip name={name} dirty={dirty} onClose={() => run("close-tab")} onNew={() => run("new")} />
 
       <main className="body">
         <Sidebar width={sidebarWidth} />

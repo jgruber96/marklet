@@ -8,6 +8,9 @@ import "@fontsource/jetbrains-mono/700.css";
 import "./styles/theme.css";
 import "./styles/app.css";
 import App from "./App";
+import { applyTheme, cachedTheme } from "./lib/stores/settings";
+
+applyTheme(cachedTheme());
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
