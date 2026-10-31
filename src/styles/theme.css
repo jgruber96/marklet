@@ -1,0 +1,71 @@
+/*
+ * Nova MD design tokens — the single source for the editor, preview and export.
+ * Light is the default; dark applies when the OS prefers it, unless the
+ * <html data-theme="light"> override is set, or always with data-theme="dark".
+ */
+
+:root {
+  color-scheme: light;
+
+  --bg: #ffffff;
+  --bar: #f6f7f9;
+  --border: #e3e5e8;
+  --text: #1f2328;
+  --muted: #57606a;
+  --accent: #2f6feb;
+  --selected: #e8eef9;
+  --code-bg: #f6f8fa;
+  --current-line: #eef3fd;
+
+  /* Syntax token palette, shared by CodeMirror and Shiki. */
+  --tok-keyword: #cf222e;
+  --tok-string: #0a3069;
+  --tok-function: #8250df;
+  --tok-comment: #6e7781;
+  --tok-number: #0550ae;
+
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #17191c;
+    --bar: #1f2226;
+    --border: #2e3238;
+    --text: #e6e8eb;
+    --muted: #a0a7b1;
+    --accent: #6ea2ff;
+    --selected: #2a2f37;
+    --code-bg: #111316;
+    --current-line: #232830;
+
+    --tok-keyword: #ff7b72;
+    --tok-string: #a5d6ff;
+    --tok-function: #d2a8ff;
+    --tok-comment: #8b949e;
+    --tok-number: #79c0ff;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #17191c;
+  --bar: #1f2226;
+  --border: #2e3238;
+  --text: #e6e8eb;
+  --muted: #a0a7b1;
+  --accent: #6ea2ff;
+  --selected: #2a2f37;
+  --code-bg: #111316;
+  --current-line: #232830;
+
+  --tok-keyword: #ff7b72;
+  --tok-string: #a5d6ff;
+  --tok-function: #d2a8ff;
+  --tok-comment: #8b949e;
+  --tok-number: #79c0ff;
+}

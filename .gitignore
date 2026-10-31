@@ -1,0 +1,8 @@
+node_modules
+dist
+src-tauri/target
+src-tauri/gen/schemas
+# machine-local Cargo settings (short target dir on Windows)
+src-tauri/.cargo/config.toml
+*.log
+.DS_Store
