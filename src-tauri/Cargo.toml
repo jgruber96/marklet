@@ -3,6 +3,7 @@ name = "nova-md"
 version = "0.1.0"
 description = "Nova MD — a Markdown editor"
 authors = ["DarkstarDEV"]
+license = "MIT"
 edition = "2021"
 
 [build-dependencies]

@@ -65,3 +65,7 @@ Not yet run on a Mac. On macOS 13+ (Apple Silicon), check:
 - [x] 4. Workspace and tabs: folder tree with new/rename/delete, folder watcher, multiple tabs, session and window-size restore
 - [x] 5. Outline, toolbar and status bar: outline with jump and in-view highlight, formatting buttons and Ctrl/Cmd+B/I/K, autosave setting, status bar
 - [x] 6. Export and polish: HTML and PDF export, theme and accent settings, View menu, keyboard pass, file associations (tested on Windows; macOS checklist above)
+
+## License
+
+[MIT](LICENSE) © DarkstarDEV. The bundled Inter and JetBrains Mono fonts are under the SIL Open Font License.
