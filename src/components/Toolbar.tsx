@@ -18,6 +18,7 @@ interface ToolbarProps {
   onViewMode(mode: ViewMode): void;
   onNew(): void;
   onOpen(): void;
+  onOpenFolder(): void;
 }
 
 const viewModes: { mode: ViewMode; label: string }[] = [
@@ -38,7 +39,7 @@ const formatting = [
   { icon: List, label: "Bulleted list" },
 ];
 
-export function Toolbar({ viewMode, onViewMode, onNew, onOpen }: ToolbarProps) {
+export function Toolbar({ viewMode, onViewMode, onNew, onOpen, onOpenFolder }: ToolbarProps) {
   return (
     <div className="toolbar">
       <button className="tb-btn" onClick={onNew} title={`New (${mod}N)`}>
@@ -47,7 +48,7 @@ export function Toolbar({ viewMode, onViewMode, onNew, onOpen }: ToolbarProps) {
       <button className="tb-btn" onClick={onOpen} title={`Open file (${mod}O)`}>
         <FileText size={16} /> Open
       </button>
-      <button className="tb-btn" disabled title={later(4)}>
+      <button className="tb-btn" onClick={onOpenFolder} title={`Open folder (${mod}Shift+O)`}>
         <FolderOpen size={16} /> Open Folder
       </button>
 

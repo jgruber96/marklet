@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { message, open, save } from "@tauri-apps/plugin-dialog";
+import { baseName, joinPath } from "../paths";
 
 export type LineEnding = "\n" | "\r\n";
 
@@ -10,14 +11,19 @@ export interface Doc {
   bom: boolean;
   /** Text as last loaded or saved, with `\n` line endings; drives the unsaved dot. */
   savedText: string;
+  /** Shown until the file is first saved. */
+  untitledName: string;
 }
 
-export const untitledDoc = (): Doc => ({ path: null, lineEnding: "\n", bom: false, savedText: "" });
+export const untitledDoc = (untitledName = "Untitled.md"): Doc => ({
+  path: null,
+  lineEnding: "\n",
+  bom: false,
+  savedText: "",
+  untitledName,
+});
 
-export function docName(doc: Doc): string {
-  if (!doc.path) return "Untitled.md";
-  return doc.path.split(/[\\/]/).pop() ?? doc.path;
-}
+export const docName = (doc: Doc): string => (doc.path ? baseName(doc.path) : doc.untitledName);
 
 const markdownFilter = [{ name: "Markdown", extensions: ["md", "markdown"] }];
 
@@ -26,13 +32,18 @@ export async function pickFileToOpen(): Promise<string | null> {
   return typeof picked === "string" ? picked : null;
 }
 
-export async function pickSavePath(doc: Doc): Promise<string | null> {
-  return save({ defaultPath: docName(doc), filters: markdownFilter });
+/** Save dialog; a new file starts out in `folder` (the workspace) when there is one. */
+export async function pickSavePath(doc: Doc, folder: string | null): Promise<string | null> {
+  const name = docName(doc);
+  return save({ defaultPath: !doc.path && folder ? joinPath(folder, name) : doc.path ?? name, filters: markdownFilter });
 }
 
 export async function readDoc(path: string): Promise<{ doc: Doc; text: string }> {
   const file = await invoke<{ text: string; lineEnding: LineEnding; bom: boolean }>("read_file", { path });
-  return { doc: { path, lineEnding: file.lineEnding, bom: file.bom, savedText: file.text }, text: file.text };
+  return {
+    doc: { path, lineEnding: file.lineEnding, bom: file.bom, savedText: file.text, untitledName: "" },
+    text: file.text,
+  };
 }
 
 export async function writeDoc(path: string, text: string, doc: Doc): Promise<void> {

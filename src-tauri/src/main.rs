@@ -3,6 +3,7 @@
 
 mod fs;
 mod menu;
+mod watcher;
 
 fn main() {
     tauri::Builder::default()
@@ -10,6 +11,8 @@ fn main() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .manage(watcher::FolderWatcher::default())
         .setup(|app| {
             let menu = menu::build(app.handle())?;
             app.set_menu(menu)?;
@@ -19,6 +22,12 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             fs::read_file,
             fs::write_file,
+            fs::list_folder,
+            fs::create_file,
+            fs::rename_path,
+            fs::trash_path,
+            watcher::watch_folder,
+            watcher::unwatch_folder,
             menu::sync_theme_menu
         ])
         .run(tauri::generate_context!())

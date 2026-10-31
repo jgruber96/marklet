@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import { EditorState } from "@codemirror/state";
+import { EditorState, type StateEffect } from "@codemirror/state";
 import {
   EditorView,
   drawSelection,
@@ -15,9 +15,10 @@ import { markdownHighlighting } from "./highlight";
 import { editorCodeLanguages } from "../languages";
 
 export interface EditorHandle {
-  /** Replaces the document and resets undo history (used when opening a file). */
-  setDoc(text: string): void;
-  getDoc(): string;
+  /** A fresh state (own undo history) for a tab that isn't shown yet. */
+  createState(text: string): EditorState;
+  /** Shows a tab's state, then restores its scroll position if given. */
+  showState(state: EditorState, scroll?: StateEffect<unknown>): void;
   focus(): void;
   readonly view: EditorView | null;
 }
@@ -70,14 +71,17 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(prop
   }, []);
 
   useImperativeHandle(ref, () => ({
-    setDoc(text) {
+    createState,
+    showState(state, scroll) {
       const v = view.current;
       if (!v) return;
-      v.setState(createState(text));
+      v.setState(state);
+      if (scroll) v.dispatch({ effects: scroll });
       v.focus();
-      callbacks.current.onCursor(1, 1);
+      const head = state.selection.main.head;
+      const line = state.doc.lineAt(head);
+      callbacks.current.onCursor(line.number, head - line.from + 1);
     },
-    getDoc: () => view.current?.state.doc.toString() ?? "",
     focus: () => view.current?.focus(),
     get view() {
       return view.current;

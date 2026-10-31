@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { ask } from "@tauri-apps/plugin-dialog";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import type { EditorState, StateEffect } from "@codemirror/state";
 import { Editor, type EditorHandle } from "./lib/editor/Editor";
 import { Sidebar } from "./lib/sidebar/Sidebar";
 import {
@@ -20,6 +23,7 @@ import {
   type ThemeSetting,
   applyTheme,
   type ViewMode,
+  flushSettings,
   isThemeSetting,
   loadTheme,
   loadViewMode,
@@ -27,9 +31,20 @@ import {
   saveViewMode,
   syncThemeMenu,
 } from "./lib/stores/settings";
+import {
+  type TreeNode,
+  confirmTrash,
+  createFile,
+  listFolder,
+  pickFolder,
+  renamePath,
+  trashPath,
+  watchFolder,
+} from "./lib/stores/workspace";
+import { loadSession, saveSession } from "./lib/tabs/session";
+import { dirOf, isInside, joinPath, reroot, samePath, withMarkdownExt } from "./lib/paths";
 import { Preview, type PreviewHandle } from "./lib/preview/Preview";
 import { ScrollSync } from "./lib/preview/scrollSync";
-import { dirOf } from "./lib/preview/render";
 import { Toolbar } from "./components/Toolbar";
 import { TabStrip } from "./components/TabStrip";
 import { StatusBar } from "./components/StatusBar";
@@ -39,19 +54,33 @@ const SIDEBAR_MIN = 180;
 const SIDEBAR_MAX = 420;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+interface Tab {
+  id: number;
+  doc: Doc;
+  /** Editor state while the tab is in the background; the view owns the front tab's state. */
+  state: EditorState;
+  scroll?: StateEffect<unknown>;
+  dirty: boolean;
+  /** The file was deleted or moved away on disk; saving writes it back. */
+  missing: boolean;
+}
+
 export default function App() {
   const editor = useRef<EditorHandle>(null);
   const panes = useRef<HTMLDivElement>(null);
+  const preview = useRef<PreviewHandle>(null);
+  const scrollSync = useRef<ScrollSync | null>(null);
 
-  const [doc, setDocState] = useState<Doc>(untitledDoc);
-  const docRef = useRef(doc);
-  const setDoc = (d: Doc) => {
-    docRef.current = d;
-    setDocState(d);
-  };
-  const textRef = useRef("");
+  // Tabs are mutable records; `render` repaints after a change.
+  const tabs = useRef<Tab[]>([]);
+  const activeId = useRef(0);
+  const nextId = useRef(1);
+  const [, render] = useReducer((n: number) => n + 1, 0);
 
-  const [dirty, setDirty] = useState(false);
+  const root = useRef<string | null>(null);
+  const [nodes, setNodes] = useState<TreeNode[]>([]);
+  const expanded = useRef(new Set<string>());
+
   const [words, setWords] = useState(0);
   const [cursor, setCursor] = useState({ line: 1, col: 1 });
   const [sidebarWidth, setSidebarWidth] = useState(240);
@@ -59,65 +88,283 @@ export default function App() {
   const [viewMode, setViewModeState] = useState<ViewMode>("split");
   const [source, setSource] = useState("");
 
-  const preview = useRef<PreviewHandle>(null);
-  const scrollSync = useRef<ScrollSync | null>(null);
+  const activeTab = (): Tab | undefined => tabs.current.find((t) => t.id === activeId.current);
+  const findTab = (path: string) => tabs.current.find((t) => t.doc.path && samePath(t.doc.path, path));
 
-  const isDirty = () => textRef.current !== docRef.current.savedText;
+  const textOf = (tab: Tab): string => {
+    const view = editor.current?.view;
+    return tab.id === activeId.current && view ? view.state.doc.toString() : tab.state.doc.toString();
+  };
 
-  const loadIntoEditor = (next: Doc, text: string) => {
-    setDoc(next);
-    textRef.current = text;
-    editor.current?.setDoc(text);
-    setDirty(false);
+  const updateDirty = (tab: Tab) => {
+    tab.dirty = tab.missing || textOf(tab) !== tab.doc.savedText;
+    render();
+  };
+
+  const persistSession = () => {
+    const files = tabs.current.filter((t) => t.doc.path);
+    void saveSession({
+      workspace: root.current,
+      expanded: [...expanded.current],
+      files: files.map((t) => t.doc.path!),
+      active: Math.max(0, files.findIndex((t) => t.id === activeId.current)),
+    });
+  };
+
+  // ---- Tabs ----
+
+  /** Brings a tab to the front, parking the current one's editor state and scroll. */
+  const show = (id: number) => {
+    const view = editor.current?.view;
+    const current = activeTab();
+    if (current && view && current.id !== id) {
+      current.state = view.state;
+      current.scroll = view.scrollSnapshot();
+    }
+    activeId.current = id;
+    const tab = activeTab();
+    if (!tab) return;
+    editor.current?.showState(tab.state, tab.scroll);
+    const text = textOf(tab);
     setWords(countWords(text));
     setSource(text);
     scrollSync.current?.followEditor();
+    render();
+    persistSession();
   };
 
-  const setViewMode = (mode: ViewMode) => {
-    setViewModeState(mode);
-    void saveViewMode(mode);
+  const nextUntitledName = () => {
+    const used = new Set(tabs.current.filter((t) => !t.doc.path).map((t) => t.doc.untitledName));
+    for (let n = 1; ; n++) {
+      const name = n === 1 ? "Untitled.md" : `Untitled-${n}.md`;
+      if (!used.has(name)) return name;
+    }
   };
 
-  /** Saves the current document; returns false if the user cancelled the save dialog. */
-  const save = async (askForPath = false): Promise<boolean> => {
-    const current = docRef.current;
-    const path = (!askForPath && current.path) || (await pickSavePath(current));
-    if (!path) return false;
-    const text = textRef.current;
+  /** True for the empty Untitled tab the app starts with, which a newly opened file replaces. */
+  const isPristine = (tab: Tab | undefined) => !!tab && !tab.doc.path && !tab.dirty && textOf(tab) === "";
+
+  const addTab = (doc: Doc, text: string, { replacePristine = true, front = true } = {}): Tab => {
+    const tab: Tab = { id: nextId.current++, doc, state: editor.current!.createState(text), dirty: false, missing: false };
+    const current = activeTab();
+    const at = current ? tabs.current.indexOf(current) : tabs.current.length - 1;
+    if (replacePristine && isPristine(current)) tabs.current.splice(at, 1, tab);
+    else tabs.current.splice(at + 1, 0, tab);
+    if (front) show(tab.id);
+    return tab;
+  };
+
+  const newTab = () => addTab(untitledDoc(nextUntitledName()), "", { replacePristine: false });
+
+  const openPath = async (path: string) => {
+    const existing = findTab(path);
+    if (existing) return show(existing.id);
     try {
-      await writeDoc(path, text, current);
+      const { doc, text } = await readDoc(path);
+      addTab(doc, text);
+    } catch (err) {
+      await showError(err);
+    }
+  };
+
+  /** Saves a tab; returns false if the save was cancelled or failed. */
+  const saveTab = async (tab: Tab, askForPath = false): Promise<boolean> => {
+    const path = (!askForPath && tab.doc.path) || (await pickSavePath(tab.doc, root.current));
+    if (!path) return false;
+    const text = textOf(tab);
+    try {
+      await writeDoc(path, text, tab.doc);
     } catch (err) {
       await showError(err);
       return false;
     }
-    setDoc({ ...current, path, savedText: text });
-    setDirty(textRef.current !== text);
+    tab.doc = { ...tab.doc, path, savedText: text };
+    tab.missing = false;
+    updateDirty(tab);
+    persistSession();
     return true;
   };
 
-  /** Resolves true when it is safe to drop the current document. */
-  const confirmDiscard = async (): Promise<boolean> => {
-    if (!isDirty()) return true;
-    const choice = await askToSave(docRef.current);
-    if (choice === "save") return save();
+  /** Resolves true when the tab may be dropped: saved, discarded, or clean. */
+  const confirmDiscard = async (tab: Tab): Promise<boolean> => {
+    updateDirty(tab);
+    if (!tab.dirty) return true;
+    if (tab.id !== activeId.current) show(tab.id);
+    const choice = await askToSave(tab.doc);
+    if (choice === "save") return saveTab(tab);
     return choice === "discard";
   };
 
-  const newFile = async () => {
-    if (await confirmDiscard()) loadIntoEditor(untitledDoc(), "");
+  /** Removes tabs without asking; an empty strip gets a fresh Untitled tab. */
+  const dropTabs = (ids: number[]) => {
+    const wasActive = ids.includes(activeId.current);
+    const index = tabs.current.findIndex((t) => t.id === activeId.current);
+    tabs.current = tabs.current.filter((t) => !ids.includes(t.id));
+    if (tabs.current.length === 0) addTab(untitledDoc(), "");
+    else if (wasActive) show(tabs.current[Math.min(index, tabs.current.length - 1)].id);
+    else render();
+    persistSession();
   };
 
-  const openFile = async () => {
-    if (!(await confirmDiscard())) return;
-    const path = await pickFileToOpen();
-    if (!path) return;
+  const closeTab = async (id: number) => {
+    const tab = tabs.current.find((t) => t.id === id);
+    if (tab && (await confirmDiscard(tab))) dropTabs([id]);
+  };
+
+  const cycleTab = (step: number) => {
+    const list = tabs.current;
+    const i = list.findIndex((t) => t.id === activeId.current);
+    if (list.length > 1) show(list[(i + step + list.length) % list.length].id);
+  };
+
+  /** Writes text into a tab as one edit, keeping its undo history. */
+  const replaceText = (tab: Tab, text: string) => {
+    const view = editor.current?.view;
+    if (tab.id === activeId.current && view) {
+      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
+    } else {
+      tab.state = tab.state.update({ changes: { from: 0, to: tab.state.doc.length, insert: text } }).state;
+    }
+  };
+
+  // ---- Workspace ----
+
+  const refreshTree = async () => {
+    const dir = root.current;
+    if (!dir) return setNodes([]);
     try {
-      const { doc: next, text } = await readDoc(path);
-      loadIntoEditor(next, text);
+      const list = await listFolder(dir);
+      if (root.current === dir) setNodes(list);
+    } catch {
+      if (root.current === dir) setNodes([]);
+    }
+  };
+
+  const setWorkspace = async (dir: string | null, open: string[] = []) => {
+    root.current = dir;
+    expanded.current = new Set(open);
+    setNodes([]);
+    render();
+    persistSession();
+    try {
+      await watchFolder(dir);
+    } catch (err) {
+      console.warn(err); // The tree still works; it just won't follow outside changes.
+    }
+    await refreshTree();
+  };
+
+  const toggleFolder = (path: string) => {
+    if (!expanded.current.delete(path)) expanded.current.add(path);
+    render();
+    persistSession();
+  };
+
+  const createInFolder = async (dir: string, name: string): Promise<boolean> => {
+    const path = joinPath(dir, withMarkdownExt(name));
+    try {
+      await createFile(path);
     } catch (err) {
       await showError(err);
+      return false;
     }
+    // Expand every folder down to the new file (a typed name can include subfolders).
+    for (let d = dirOf(path); d && root.current && !samePath(d, root.current) && isInside(d, root.current); d = dirOf(d)) {
+      expanded.current.add(d);
+    }
+    await refreshTree();
+    await openPath(path);
+    return true;
+  };
+
+  const renameEntry = async (path: string, name: string): Promise<boolean> => {
+    const parent = dirOf(path);
+    if (!parent || /[\\/]/.test(name)) {
+      await showError("A name can't contain / or \\.");
+      return false;
+    }
+    const to = joinPath(parent, name);
+    try {
+      await renamePath(path, to);
+    } catch (err) {
+      await showError(err);
+      return false;
+    }
+    // Open tabs and expanded folders follow the file or folder to its new name.
+    for (const tab of tabs.current) {
+      if (tab.doc.path && isInside(tab.doc.path, path)) tab.doc = { ...tab.doc, path: reroot(tab.doc.path, path, to) };
+    }
+    expanded.current = new Set([...expanded.current].map((p) => (isInside(p, path) ? reroot(p, path, to) : p)));
+    render();
+    persistSession();
+    await refreshTree();
+    return true;
+  };
+
+  const deleteEntry = async (node: TreeNode) => {
+    const affected = tabs.current.filter((t) => t.doc.path && isInside(t.doc.path, node.path));
+    affected.forEach(updateDirty);
+    if (!(await confirmTrash(node.path, node.isDir, affected.some((t) => t.dirty)))) return;
+    try {
+      await trashPath(node.path);
+    } catch (err) {
+      return showError(err);
+    }
+    if (affected.length) dropTabs(affected.map((t) => t.id));
+    await refreshTree();
+  };
+
+  /** A file in the workspace changed on disk: bring its tab up to date. */
+  const reloadTab = async (tab: Tab) => {
+    const path = tab.doc.path!;
+    let disk: Awaited<ReturnType<typeof readDoc>>;
+    try {
+      disk = await readDoc(path);
+    } catch {
+      // Deleted or moved away: keep the text, and show it as unsaved.
+      tab.missing = true;
+      return updateDirty(tab);
+    }
+    tab.missing = false;
+    const fresh = { ...disk.doc, untitledName: tab.doc.untitledName };
+    if (disk.text === tab.doc.savedText || disk.text === textOf(tab)) {
+      // Our own save, or nothing that differs from what's in the editor.
+      tab.doc = fresh;
+      return updateDirty(tab);
+    }
+    updateDirty(tab);
+    if (tab.dirty) {
+      if (tab.id !== activeId.current) show(tab.id);
+      const reload = await ask(`${docName(tab.doc)} changed on disk. Reload it and lose your unsaved changes?`, {
+        title: "Nova MD",
+        kind: "warning",
+        okLabel: "Reload",
+        cancelLabel: "Keep My Changes",
+      });
+      if (!reload) {
+        // Saving will overwrite the disk version; don't ask again for this one.
+        tab.doc = fresh;
+        return updateDirty(tab);
+      }
+    }
+    tab.doc = fresh;
+    replaceText(tab, disk.text);
+    updateDirty(tab);
+  };
+
+  const onFsChange = (paths: string[]) => {
+    void refreshTree();
+    for (const tab of tabs.current) {
+      const path = tab.doc.path;
+      if (path && paths.some((p) => isInside(path, p))) void exclusive(() => reloadTab(tab), true);
+    }
+  };
+
+  // ---- Commands ----
+
+  const setViewMode = (mode: ViewMode) => {
+    setViewModeState(mode);
+    void saveViewMode(mode);
   };
 
   const setTheme = async (theme: ThemeSetting) => {
@@ -125,48 +372,76 @@ export default function App() {
     await saveTheme(theme);
   };
 
+  const withActive = (fn: (tab: Tab) => Promise<unknown>) => async () => {
+    const tab = activeTab();
+    if (tab) await fn(tab);
+  };
+
   /** Commands shared by the File menu, the toolbar, the tab strip and shortcuts. */
   const commands: Record<string, () => Promise<unknown>> = {
-    new: newFile,
-    open: openFile,
-    save: () => save(),
-    "save-as": () => save(true),
-    "close-tab": newFile, // single tab until milestone 4: closing leaves an empty Untitled
+    new: async () => newTab(),
+    open: async () => {
+      const path = await pickFileToOpen();
+      if (path) await openPath(path);
+    },
+    "open-folder": async () => {
+      const dir = await pickFolder();
+      if (dir) await setWorkspace(dir);
+    },
+    "close-folder": () => setWorkspace(null),
+    save: withActive((tab) => saveTab(tab)),
+    "save-as": withActive((tab) => saveTab(tab, true)),
+    "close-tab": async () => closeTab(activeId.current),
+    "next-tab": async () => cycleTab(1),
+    "prev-tab": async () => cycleTab(-1),
   };
 
   // Latest handlers for listeners registered once.
-  const actions = useRef({ commands, confirmDiscard, setTheme });
-  actions.current = { commands, confirmDiscard, setTheme };
+  const actions = useRef({ commands, onFsChange, setTheme, confirmDiscard });
+  actions.current = { commands, onFsChange, setTheme, confirmDiscard };
 
   // Serialize file actions so a second trigger can't open a second dialog. A
   // shortcut can arrive both as a keydown and as a menu accelerator, so the
   // same command repeated within a moment is dropped.
   const busy = useRef(false);
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
   const last = useRef({ id: "", at: 0 });
-  const run = async (id: string) => {
+
+  /** Runs a file action unless one is in progress; `wait` queues it behind instead. */
+  const exclusive = async (fn: () => Promise<unknown>, wait = false) => {
+    if (busy.current && !wait) return;
+    const run = queue.current.then(async () => {
+      busy.current = true;
+      try {
+        await fn();
+      } finally {
+        busy.current = false;
+      }
+    });
+    queue.current = run.catch(() => {});
+    await run;
+    if (!wait) editor.current?.focus();
+  };
+
+  const run = (id: string) => {
     const action = actions.current.commands[id];
     const now = performance.now();
-    if (!action || busy.current || (last.current.id === id && now - last.current.at < 400)) return;
+    if (!action || (last.current.id === id && now - last.current.at < 400)) return;
     last.current = { id, at: now };
-    busy.current = true;
-    try {
-      await action();
-    } finally {
-      busy.current = false;
-      editor.current?.focus();
-    }
+    void exclusive(action);
   };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
       const key = e.key.toLowerCase();
-      const id = e.shiftKey
-        ? key === "s" ? "save-as" : null
-        : ({ n: "new", o: "open", s: "save", w: "close-tab" } as Record<string, string>)[key] ?? null;
+      let id: string | null;
+      if (key === "tab" && e.ctrlKey) id = e.shiftKey ? "prev-tab" : "next-tab";
+      else if (e.shiftKey) id = ({ s: "save-as", o: "open-folder" } as Record<string, string>)[key] ?? null;
+      else id = ({ n: "new", o: "open", s: "save", w: "close-tab" } as Record<string, string>)[key] ?? null;
       if (!id) return;
       e.preventDefault();
-      void run(id);
+      run(id);
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -178,19 +453,41 @@ export default function App() {
     const unlisten = listen<string>("menu", ({ payload: id }) => {
       const theme = id.startsWith("theme:") ? id.slice("theme:".length) : null;
       if (isThemeSetting(theme)) void actions.current.setTheme(theme);
-      else void run(id);
+      else run(id);
     });
+    const unwatch = listen<string[]>("fs-change", ({ payload }) => actions.current.onFsChange(payload));
     return () => {
       void unlisten.then((fn) => fn());
+      void unwatch.then((fn) => fn());
     };
   }, []);
 
+  // Startup: settings, then the last session's folder and tabs.
+  const started = useRef(false);
   useEffect(() => {
     void loadTheme().then((theme) => {
       applyTheme(theme);
       void syncThemeMenu(theme);
     });
     void loadViewMode().then(setViewModeState);
+    if (started.current) return;
+    started.current = true;
+    void exclusive(async () => {
+      const session = await loadSession();
+      if (session.workspace) await setWorkspace(session.workspace, session.expanded);
+      const opened: Tab[] = [];
+      for (const path of session.files) {
+        try {
+          const { doc, text } = await readDoc(path);
+          opened.push(addTab(doc, text, { front: false }));
+        } catch {
+          // Moved or deleted since last time: skip it.
+        }
+      }
+      const front = session.files[session.active];
+      if (opened.length === 0) addTab(untitledDoc(), "");
+      else show((opened.find((t) => front && samePath(t.doc.path!, front)) ?? opened[opened.length - 1]).id);
+    });
   }, []);
 
   useEffect(() => {
@@ -210,16 +507,29 @@ export default function App() {
     scrollSync.current?.setEnabled(viewMode === "split");
   }, [viewMode]);
 
+  // Closing the window asks about each unsaved tab in turn.
   useEffect(() => {
     if (!isTauri()) return;
     const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
-      if (busy.current || !(await actions.current.confirmDiscard())) event.preventDefault();
+      if (busy.current) return event.preventDefault();
+      busy.current = true;
+      try {
+        for (const tab of [...tabs.current]) {
+          if (!(await actions.current.confirmDiscard(tab))) return event.preventDefault();
+        }
+        await flushSettings();
+      } finally {
+        busy.current = false;
+      }
     });
     return () => {
       void unlisten.then((fn) => fn());
     };
   }, []);
 
+  const active = activeTab();
+  const doc = active?.doc ?? untitledDoc();
+  const dirty = active?.dirty ?? false;
   const name = docName(doc);
   useEffect(() => {
     if (isTauri()) void getCurrentWindow().setTitle(`${dirty ? "● " : ""}${name} — Nova MD`);
@@ -232,11 +542,36 @@ export default function App() {
 
   return (
     <div className="app">
-      <Toolbar viewMode={viewMode} onViewMode={setViewMode} onNew={() => run("new")} onOpen={() => run("open")} />
-      <TabStrip name={name} dirty={dirty} onClose={() => run("close-tab")} onNew={() => run("new")} />
+      <Toolbar
+        viewMode={viewMode}
+        onViewMode={setViewMode}
+        onNew={() => run("new")}
+        onOpen={() => run("open")}
+        onOpenFolder={() => run("open-folder")}
+      />
+      <TabStrip
+        tabs={tabs.current.map((t) => ({ id: t.id, name: docName(t.doc), title: t.doc.path ?? docName(t.doc), dirty: t.dirty }))}
+        activeId={activeId.current}
+        onSelect={(id) => id !== activeId.current && show(id)}
+        onClose={(id) => void exclusive(() => closeTab(id))}
+        onNew={() => run("new")}
+      />
 
       <main className="body">
-        <Sidebar width={sidebarWidth} />
+        <Sidebar
+          width={sidebarWidth}
+          root={root.current}
+          nodes={nodes}
+          expanded={expanded.current}
+          activePath={doc.path}
+          onOpenFile={(path) => void exclusive(() => openPath(path))}
+          onOpenFolder={() => run("open-folder")}
+          onToggle={toggleFolder}
+          onCreate={(dir, fileName) => createInFolder(dir, fileName)}
+          onRename={(path, newName) => renameEntry(path, newName)}
+          onDelete={(node) => void exclusive(() => deleteEntry(node))}
+          onReveal={(path) => void revealItemInDir(path)}
+        />
         <Splitter label="Resize sidebar" onDrag={(x) => setSidebarWidth(clamp(x, SIDEBAR_MIN, SIDEBAR_MAX))} />
 
         <div className="panes" ref={panes}>
@@ -250,8 +585,8 @@ export default function App() {
             <Editor
               ref={editor}
               onDocChange={(text) => {
-                textRef.current = text;
-                setDirty(isDirty());
+                const tab = activeTab();
+                if (tab) updateDirty(tab);
                 setWords(countWords(text));
                 setSource(text);
               }}
@@ -265,6 +600,7 @@ export default function App() {
             baseDir={dirOf(doc.path)}
             hidden={viewMode === "editor"}
             onRendered={() => scrollSync.current?.afterRender()}
+            onOpenFile={(path) => void exclusive(() => openPath(path))}
           />
         </div>
       </main>

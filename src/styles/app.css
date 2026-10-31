@@ -119,8 +119,21 @@ button {
   border-bottom: 1px solid var(--border);
 }
 
+.tabs {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
 .tab {
   display: flex;
+  flex: none;
+  cursor: default;
   align-items: center;
   gap: 8px;
   max-width: 240px;
@@ -216,6 +229,108 @@ button {
 .side-empty {
   padding: 4px 14px 12px;
   color: var(--muted);
+}
+
+/* File tree */
+
+.tree {
+  flex: 1;
+  padding-bottom: 8px;
+}
+
+.tree-root,
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding-right: 8px;
+}
+
+.tree-root {
+  padding-left: 14px;
+  font-weight: 600;
+}
+
+.tree-row {
+  color: var(--text);
+  cursor: default;
+  outline: none;
+}
+
+.tree-row:hover {
+  background: color-mix(in srgb, var(--selected) 60%, transparent);
+}
+
+.tree-row.active,
+.tree-row:focus-visible {
+  background: var(--selected);
+}
+
+.tree-row:focus-visible {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.tree-icon {
+  flex: none;
+  color: var(--muted);
+}
+
+.tree-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tree-input {
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  padding: 0 4px;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  outline: none;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  user-select: text;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--selected);
+  color: var(--text);
+}
+
+.link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+.side-empty p {
+  margin: 0 0 6px;
 }
 
 .panes {

@@ -5,6 +5,7 @@ import DOMPurify from "dompurify";
 import { convertFileSrc, isTauri } from "@tauri-apps/api/core";
 import { fenceTag, languageForTag } from "../languages";
 import { escapeHtml, highlightCode } from "./highlight";
+import { joinPath } from "../paths";
 
 interface RenderEnv {
   /** Folder of the open file, for resolving relative image paths. */
@@ -69,22 +70,6 @@ function resolveLocalSrc(src: string, baseDir: string | null): string {
     path = joinPath(baseDir, path);
   }
   return convertFileSrc(path);
-}
-
-function joinPath(dir: string, rel: string): string {
-  const sep = dir.includes("\\") ? "\\" : "/";
-  const parts = dir.split(/[\\/]/);
-  for (const seg of rel.split(/[\\/]/)) {
-    if (seg === "..") parts.length > 1 && parts.pop();
-    else if (seg !== "." && seg !== "") parts.push(seg);
-  }
-  return parts.join(sep);
-}
-
-export function dirOf(path: string | null): string | null {
-  if (!path) return null;
-  const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  return i > 0 ? path.slice(0, i) : null;
 }
 
 // DOMPurify's default URI allow-list plus `asset:`, which is how Tauri serves

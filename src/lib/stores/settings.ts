@@ -10,7 +10,7 @@ export const isThemeSetting = (v: unknown): v is ThemeSetting => v === "system" 
 const THEME_CACHE_KEY = "nova-md:theme";
 
 let store: Promise<Store> | null = null;
-const settingsStore = () => (store ??= load("settings.json", { defaults: { theme: "system" }, autoSave: 200 }));
+export const settingsStore = () => (store ??= load("settings.json", { defaults: { theme: "system" }, autoSave: 200 }));
 
 /** Applies the theme to the page and the native window chrome. */
 export function applyTheme(theme: ThemeSetting): void {
@@ -67,4 +67,9 @@ export async function saveViewMode(mode: ViewMode): Promise<void> {
 /** Ticks the matching item in Settings › Theme. */
 export async function syncThemeMenu(theme: ThemeSetting): Promise<void> {
   if (isTauri()) await invoke("sync_theme_menu", { theme });
+}
+
+/** Writes pending changes now instead of after the auto-save delay (used on quit). */
+export async function flushSettings(): Promise<void> {
+  if (isTauri()) await (await settingsStore()).save();
 }

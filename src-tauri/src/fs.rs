@@ -52,6 +52,106 @@ pub fn write_file(path: String, text: String, line_ending: String, bom: bool) ->
     })
 }
 
+/// One row of the workspace tree: a Markdown file, or a folder that holds some.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TreeNode {
+    name: String,
+    path: String,
+    is_dir: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    children: Option<Vec<TreeNode>>,
+}
+
+/// Folders that never hold notes but can hold a great many files.
+const SKIPPED_DIRS: [&str; 3] = ["node_modules", "target", "dist"];
+const MAX_DEPTH: usize = 16;
+const MAX_FILES: usize = 10_000;
+
+pub fn is_markdown(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("md") || e.eq_ignore_ascii_case("markdown"))
+}
+
+/// Hidden and build folders are left out of the tree and ignored by the watcher.
+pub fn is_skipped_dir(name: &str) -> bool {
+    name.starts_with('.') || SKIPPED_DIRS.contains(&name)
+}
+
+/// Every `.md` / `.markdown` file under `root`, folders first, then by name.
+/// Folders without any Markdown file inside are left out.
+#[tauri::command]
+pub async fn list_folder(root: String) -> Result<Vec<TreeNode>, String> {
+    let mut budget = MAX_FILES;
+    list_dir(Path::new(&root), 0, &mut budget).map_err(|e| format!("Could not read {root}: {e}"))
+}
+
+fn list_dir(dir: &Path, depth: usize, budget: &mut usize) -> std::io::Result<Vec<TreeNode>> {
+    let mut nodes = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let Ok(entry) = entry else { continue };
+        // file_type() does not follow symlinks, so link loops can't recurse forever.
+        let Ok(kind) = entry.file_type() else { continue };
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let path = entry.path();
+        if kind.is_dir() {
+            if is_skipped_dir(&name) || depth >= MAX_DEPTH {
+                continue;
+            }
+            // Unreadable subfolders are skipped rather than failing the whole tree.
+            let children = list_dir(&path, depth + 1, budget).unwrap_or_default();
+            if !children.is_empty() {
+                nodes.push(TreeNode { name, path: path_string(&path), is_dir: true, children: Some(children) });
+            }
+        } else if kind.is_file() && is_markdown(&path) && *budget > 0 {
+            *budget -= 1;
+            nodes.push(TreeNode { name, path: path_string(&path), is_dir: false, children: None });
+        }
+    }
+    nodes.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
+    Ok(nodes)
+}
+
+fn path_string(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
+/// Creates an empty file (and any missing parent folders); fails if it exists.
+#[tauri::command]
+pub fn create_file(path: String) -> Result<(), String> {
+    let target = Path::new(&path);
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("Could not create {}: {e}", parent.display()))?;
+    }
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(target)
+        .map(|_| ())
+        .map_err(|e| match e.kind() {
+            std::io::ErrorKind::AlreadyExists => format!("{path} already exists."),
+            _ => format!("Could not create {path}: {e}"),
+        })
+}
+
+/// Renames a file or folder; refuses to overwrite anything already at `to`.
+#[tauri::command]
+pub fn rename_path(from: String, to: String) -> Result<(), String> {
+    // A case-only rename names the same file on Windows and macOS, so it is allowed.
+    let case_only = from.to_lowercase() == to.to_lowercase();
+    if !case_only && Path::new(&to).exists() {
+        return Err(format!("{to} already exists."));
+    }
+    std::fs::rename(&from, &to).map_err(|e| format!("Could not rename {from}: {e}"))
+}
+
+/// Moves a file or folder to the Recycle Bin / Trash, so a delete can be undone there.
+#[tauri::command]
+pub async fn trash_path(path: String) -> Result<(), String> {
+    trash::delete(&path).map_err(|e| format!("Could not move {path} to the trash: {e}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -95,5 +195,43 @@ mod tests {
         std::fs::write(&path, [0x63, 0x61, 0x66, 0xe9]).unwrap();
         assert!(read_file(path.clone()).is_err());
         std::fs::remove_file(&path).unwrap();
+    }
+
+    #[test]
+    fn tree_lists_markdown_only_and_prunes_empty_folders() {
+        let root = std::env::temp_dir().join("nova-md-test-tree");
+        let _ = std::fs::remove_dir_all(&root);
+        for dir in ["notes/deep", "empty", ".git", "node_modules/pkg"] {
+            std::fs::create_dir_all(root.join(dir)).unwrap();
+        }
+        for file in ["b.md", "A.markdown", "skip.txt", "notes/deep/c.MD", ".git/x.md", "node_modules/pkg/r.md"] {
+            std::fs::write(root.join(file), "").unwrap();
+        }
+
+        let mut budget = MAX_FILES;
+        let tree = list_dir(&root, 0, &mut budget).unwrap();
+        let names: Vec<_> = tree.iter().map(|n| n.name.as_str()).collect();
+        assert_eq!(names, ["notes", "A.markdown", "b.md"]);
+        let deep = &tree[0].children.as_ref().unwrap()[0];
+        assert_eq!(deep.name, "deep");
+        assert_eq!(deep.children.as_ref().unwrap()[0].name, "c.MD");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn create_and_rename_refuse_to_overwrite() {
+        let dir = std::env::temp_dir().join("nova-md-test-ops");
+        let _ = std::fs::remove_dir_all(&dir);
+        let a = dir.join("sub/a.md").to_string_lossy().into_owned();
+        let b = dir.join("b.md").to_string_lossy().into_owned();
+        create_file(a.clone()).unwrap();
+        assert!(create_file(a.clone()).is_err());
+        std::fs::write(&b, "keep").unwrap();
+        assert!(rename_path(a.clone(), b.clone()).is_err());
+        assert_eq!(std::fs::read_to_string(&b).unwrap(), "keep");
+        let a_upper = dir.join("sub/A.md").to_string_lossy().into_owned();
+        rename_path(a, a_upper.clone()).unwrap();
+        assert!(Path::new(&a_upper).exists());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

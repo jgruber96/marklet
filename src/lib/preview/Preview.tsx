@@ -4,6 +4,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { renderMarkdown } from "./render";
 import { onHighlighterChange } from "./highlight";
+import { isAbsolutePath, isMarkdownPath, joinPath } from "../paths";
 
 /** Longest a keystroke waits before the preview re-renders (brief: within 150 ms). */
 const RENDER_INTERVAL_MS = 40;
@@ -18,6 +19,8 @@ interface PreviewProps {
   baseDir: string | null;
   hidden: boolean;
   onRendered(): void;
+  /** A link to another Markdown file was clicked. */
+  onOpenFile(path: string): void;
 }
 
 export const Preview = forwardRef<PreviewHandle, PreviewProps>(function Preview(props, ref) {
@@ -86,8 +89,22 @@ export const Preview = forwardRef<PreviewHandle, PreviewProps>(function Preview(
     } else if (/^(https?|mailto):/i.test(href)) {
       if (isTauri()) void openUrl(href);
       else window.open(href, "_blank", "noopener");
+    } else if (!/^[a-z][a-z0-9+.-]*:/i.test(href) || isAbsolutePath(href)) {
+      // A link to another note opens it in a tab; the #fragment is ignored for now.
+      let path = href.split("#")[0];
+      try {
+        path = decodeURI(path);
+      } catch {
+        // Use as-is.
+      }
+      const { baseDir, onOpenFile } = latest.current;
+      if (!isMarkdownPath(path)) return;
+      if (!isAbsolutePath(path)) {
+        if (!baseDir) return;
+        path = joinPath(baseDir, path);
+      }
+      onOpenFile(path);
     }
-    // Relative links to other files open in tabs once milestone 4 adds them.
   };
 
   return (

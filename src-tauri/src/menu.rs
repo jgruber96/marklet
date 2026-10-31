@@ -21,15 +21,11 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let quit_label = if cfg!(target_os = "macos") { "Quit Nova MD" } else { "Exit" };
     let quit_accel = if cfg!(target_os = "macos") { Some("CmdOrCtrl+Q") } else { None };
 
-    let open_folder = MenuItemBuilder::with_id("open-folder", "Open Folder…")
-        .accelerator("CmdOrCtrl+Shift+O")
-        .enabled(false) // milestone 4
-        .build(app)?;
-
     let mut file = SubmenuBuilder::new(app, "File")
         .item(&item("new", "New", Some("CmdOrCtrl+N"))?)
         .item(&item("open", "Open…", Some("CmdOrCtrl+O"))?)
-        .item(&open_folder)
+        .item(&item("open-folder", "Open Folder…", Some("CmdOrCtrl+Shift+O"))?)
+        .item(&item("close-folder", "Close Folder", None)?)
         .separator()
         .item(&item("save", "Save", Some("CmdOrCtrl+S"))?)
         .item(&item("save-as", "Save As…", Some("CmdOrCtrl+Shift+S"))?)
