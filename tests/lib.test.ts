@@ -45,3 +45,37 @@ describe("word count", () => {
     expect(countWords("")).toBe(0);
   });
 });
+
+import { addColumn, addRow, cleanCell, parseTable, removeColumn, removeRow, serializeTable } from "../src/lib/editor/tableModel";
+
+describe("tables edited in the Rich view", () => {
+  const source = ["| Name | Qty |", "| :-- | --: |", "| **Tea** | 2 |", "| a \\| b | 10"].join("\n");
+
+  it("reads rows, alignment and escaped pipes", () => {
+    expect(parseTable(source)).toEqual({ rows: [["Name", "Qty"], ["**Tea**", "2"], ["a \\| b", "10"]], aligns: ["left", "right"] });
+  });
+  it("rejects text that is not a table", () => {
+    expect(parseTable("| a | b |\n| nope |")).toBeNull();
+    expect(parseTable("just text")).toBeNull();
+  });
+  it("writes aligned Markdown that reads back the same", () => {
+    const model = parseTable(source)!;
+    const text = serializeTable(model);
+    expect(text).toBe(["| Name    | Qty |", "| :------ | --: |", "| **Tea** |   2 |", "| a \\| b  |  10 |"].join("\n"));
+    expect(parseTable(text)).toEqual(model);
+  });
+  it("adds and removes rows and columns, keeping the header and one of each", () => {
+    const model = parseTable("| a |\n| - |\n| 1 |")!;
+    addRow(model, 1);
+    addColumn(model, 0);
+    expect(serializeTable(model)).toBe("| a   |     |\n| --- | --- |\n| 1   |     |\n|     |     |");
+    expect(removeRow(model, 0)).toBe(false);
+    expect(removeRow(model, 2)).toBe(true);
+    expect(removeRow(model, 1)).toBe(false);
+    expect(removeColumn(model, 1)).toBe(true);
+    expect(removeColumn(model, 0)).toBe(false);
+  });
+  it("keeps a typed cell on one line with its pipes escaped", () => {
+    expect(cleanCell("  a | b\n c \\| d ")).toBe("a \\| b c \\| d");
+  });
+});

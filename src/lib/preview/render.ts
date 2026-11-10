@@ -123,9 +123,14 @@ export function renderFragment(source: string, baseDir: string | null): string {
   return render(source, baseDir, true);
 }
 
-function render(source: string, baseDir: string | null, fragment: boolean): string {
+/** The inline Markdown of one table cell, for editing tables in the Rich view. */
+export function renderInlineFragment(source: string, baseDir: string | null): string {
+  return render(source, baseDir, true, true);
+}
+
+function render(source: string, baseDir: string | null, fragment: boolean, inline = false): string {
   const env: RenderEnv = { baseDir, slots: [], slotKey: crypto.randomUUID(), diagrams: 0, fragment };
-  const html = DOMPurify.sanitize(md.render(source, env), {
+  const html = DOMPurify.sanitize(inline ? md.renderInline(source, env) : md.render(source, env), {
     ALLOWED_URI_REGEXP,
     FORBID_TAGS: ["style", "form"],
     FORBID_ATTR: ["style"],

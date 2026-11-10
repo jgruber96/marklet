@@ -6,6 +6,7 @@ import { mathHtml } from "../preview/math";
 import { onEmbedsChange } from "../preview/embeds";
 import { fenceTag } from "../languages";
 import { followLink } from "../links";
+import { TableWidget, tableTheme } from "./richTable";
 
 /*
  * Rich view: the same editor and the same plain Markdown text, drawn the way
@@ -16,8 +17,9 @@ import { followLink } from "../links";
  * into source when clicked. Ctrl/Cmd+click follows a link.
  * Nothing here changes the document except ticking a task box.
  *
- * Raw HTML, and tables, diagrams and display formulas nested inside a list or
- * a quote, stay as source in this view.
+ * Tables are edited in place, cell by cell (richTable.ts). Inside a list or a
+ * quote, tables, diagrams and formulas are drawn too, and open as source when
+ * clicked. Raw HTML stays as source in this view.
  */
 
 let enabled = false;
@@ -71,20 +73,21 @@ class MathWidget extends WidgetType {
   }
 }
 
-/** A table, diagram or display formula, drawn by the preview's renderer. */
+/** A table, diagram or display formula, drawn by the preview's renderer. `nested`: inside a list item or quote, in the flow of its line. */
 class BlockWidget extends WidgetType {
   constructor(
     readonly source: string,
     readonly dir: string | null,
+    readonly nested = false,
   ) {
     super();
   }
   eq(other: BlockWidget) {
-    return other.source === this.source && other.dir === this.dir;
+    return other.source === this.source && other.dir === this.dir && other.nested === this.nested;
   }
   toDOM(view: EditorView) {
     const box = document.createElement("div");
-    box.className = "cm-rich-block markdown-body";
+    box.className = `cm-rich-block markdown-body${this.nested ? " cm-rich-nested" : ""}`;
     drawWhenReady(box, view, () => renderFragment(this.source, this.dir));
     box.addEventListener("load", () => view.requestMeasure(), true); // images in table cells
     box.addEventListener("click", (e) => {
@@ -336,14 +339,30 @@ function richDecorations(view: EditorView): DecorationSet {
   return Decoration.set(out, true);
 }
 
-/** Top-level tables, diagrams and display formulas, replaced whole unless the selection is in them. */
+/** Containers a block can sit in and still be drawn. */
+const CONTAINERS = new Set(["Document", "BulletList", "OrderedList", "ListItem", "Blockquote"]);
+
+/**
+ * Tables, diagrams and display formulas, replaced by their drawing unless
+ * the selection is in them. At the top level the drawing takes the block's
+ * whole lines (and a table becomes editable in place); inside a list item or
+ * a quote it sits in the flow of its first line, after the marker.
+ */
 function blockDecorations(state: EditorState): DecorationSet {
   const doc = state.doc;
   const out: Range<Decoration>[] = [];
   const dir = baseDir();
+  const selected = (from: number, to: number) => state.selection.ranges.some((r) => r.from <= to && r.to >= from);
+  let depth = -1;
   syntaxTree(state).iterate({
+    leave(ref) {
+      if (CONTAINERS.has(ref.name)) depth--;
+    },
     enter(ref) {
-      if (ref.name === "Document") return true;
+      if (CONTAINERS.has(ref.name)) {
+        depth++;
+        return true;
+      }
       let block = ref.name === "Table";
       if (ref.name === "FencedCode") {
         const info = ref.node.getChild("CodeInfo");
@@ -351,11 +370,25 @@ function blockDecorations(state: EditorState): DecorationSet {
       } else if (ref.name === "Paragraph") {
         block = isDisplayMath(doc.sliceString(ref.from, ref.to));
       }
-      if (block) {
+      if (block && depth > 0) {
+        if (!selected(ref.from, ref.to)) {
+          // Later lines repeat the container's indentation and quote marks; the first line's column says how much.
+          const column = ref.from - doc.lineAt(ref.from).from;
+          const prefix = new RegExp(`^[ \\t>]{0,${column}}`);
+          const source = doc
+            .sliceString(ref.from, ref.to)
+            .split("\n")
+            .map((line, i) => (i === 0 ? line : line.replace(prefix, "")))
+            .join("\n");
+          out.push(Decoration.replace({ widget: new BlockWidget(source, dir, true) }).range(ref.from, ref.to));
+        }
+      } else if (block) {
         const from = doc.lineAt(ref.from).from;
         const to = doc.lineAt(ref.to).to;
-        if (!state.selection.ranges.some((r) => r.from <= to && r.to >= from)) {
-          out.push(Decoration.replace({ widget: new BlockWidget(doc.sliceString(from, to), dir), block: true }).range(from, to));
+        if (!selected(from, to)) {
+          const source = doc.sliceString(from, to);
+          const widget = ref.name === "Table" && TableWidget.accepts(source) ? new TableWidget(source, { dir, openFile }) : new BlockWidget(source, dir);
+          out.push(Decoration.replace({ widget, block: true }).range(from, to));
         }
       }
       return false;
@@ -500,6 +533,8 @@ const richTheme = EditorView.theme({
   ".cm-rich-block": { maxWidth: "none", margin: "0", padding: "0.3em 32px", cursor: "text", whiteSpace: "normal" },
   ".cm-rich-math": { whiteSpace: "normal" },
   ".cm-rich-block > *": { margin: "0" },
+  // Inside a list item or quote: in the line, after its marker.
+  ".cm-rich-block.cm-rich-nested": { display: "inline-block", verticalAlign: "top", maxWidth: "100%", padding: "0.2em 0" },
 });
 
-export const richView = [richPlugin, richBlocks, blockKeys, followLinks, richClass, richTheme];
+export const richView = [richPlugin, richBlocks, blockKeys, followLinks, richClass, richTheme, tableTheme];

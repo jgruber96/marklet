@@ -9,7 +9,7 @@ A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Taur
 ## Features
 
 - **Live preview** beside the editor, updated as you type, with scroll kept in sync both ways
-- **Rich view**: edit with the Markdown symbols hidden (headings, bold, links, bullets, task boxes, images, tables, math and diagrams shown as they will read); the source comes back where the cursor is, Ctrl+click follows a link, and the file stays plain Markdown
+- **Rich view**: edit with the Markdown symbols hidden (headings, bold, links, bullets, task boxes, images, tables, math and diagrams shown as they will read); the source comes back where the cursor is, tables are edited cell by cell in place, Ctrl+click follows a link, and the file stays plain Markdown
 - **Folder workspace**: a tree of every Markdown file with new, rename and delete, which follows changes made outside the app
 - **Search in folder**: a search box above the file tree lists every matching line in the folder's notes; click one to jump to it
 - **Drag and drop**: drop a note to open it, a folder to browse it, or an image onto the editor to add it
@@ -136,6 +136,7 @@ Not yet run on a Mac. On macOS 13+ (Apple Silicon), check:
 - [x] 8. Image paste: pasted images saved beside the document in `assets/` and linked with a relative path
 - [x] 9. Spell check: the web view's checker on prose only, with a Settings toggle
 - [x] 10. Auto-update: signed updates from GitHub Releases, checked at startup and from the Settings menu
+- [x] 18. Rich view finish: tables edited in place (Tab between cells, add and remove rows and columns), and tables, diagrams and formulas drawn inside lists and quotes
 - [x] 17. Settings window: one dialog for appearance, fonts, text size, line width and editing options (the Settings menu keeps its quick toggles)
 - [x] 16. Everyday basics: Open Recent, drag and drop (notes, folders, images), text zoom, and search across the open folder
 - [x] 15. Automated checks and releases: GitHub Actions run the tests on every push and build, sign and publish a release from a version tag
