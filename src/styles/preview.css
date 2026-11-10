@@ -209,6 +209,85 @@
   color: var(--tok-comment);
 }
 
+/* Math (lib/preview/math.ts). */
+
+.markdown-body .math-block {
+  margin: 0 0 1em;
+  padding: 2px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.markdown-body .math-block .katex-display {
+  margin: 0;
+}
+
+.markdown-body .math-block pre {
+  margin: 0;
+}
+
+/* Diagrams (lib/preview/mermaid.ts): one drawing per color scheme, the other hidden. */
+
+.markdown-body .mermaid-block {
+  margin: 0 0 1em;
+}
+
+.markdown-body .mermaid-diagram {
+  overflow-x: auto;
+  text-align: center;
+}
+
+.markdown-body .mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-body .mermaid-diagram[data-scheme="dark"] {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .markdown-body .mermaid-diagram[data-scheme="dark"] {
+    display: block;
+  }
+
+  :root:not([data-theme="light"]) .markdown-body .mermaid-diagram[data-scheme="light"] {
+    display: none;
+  }
+}
+
+:root[data-theme="dark"] .markdown-body .mermaid-diagram[data-scheme="dark"] {
+  display: block;
+}
+
+:root[data-theme="dark"] .markdown-body .mermaid-diagram[data-scheme="light"] {
+  display: none;
+}
+
+/* The previous drawing, while an edit is rendering or has an error. */
+.markdown-body .mermaid-stale {
+  opacity: 0.55;
+}
+
+.markdown-body .mermaid-note,
+.markdown-body .mermaid-error {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.86em;
+}
+
+.markdown-body .mermaid-error {
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+}
+
+.markdown-body .mermaid-stale + .mermaid-error {
+  margin: 8px 0 0;
+}
+
 .markdown-body table {
   display: block;
   width: max-content;

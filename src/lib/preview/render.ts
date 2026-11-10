@@ -1,4 +1,4 @@
-import MarkdownIt from "markdown-it";
+import MarkdownIt, { type Token } from "markdown-it";
 import anchor from "markdown-it-anchor";
 import taskLists from "markdown-it-task-lists";
 import DOMPurify from "dompurify";
@@ -6,16 +6,43 @@ import { convertFileSrc, isTauri } from "@tauri-apps/api/core";
 import { fenceTag, languageForTag } from "../languages";
 import { escapeHtml, highlightCode } from "./highlight";
 import { joinPath } from "../paths";
+import { mathHtml, mathSyntax } from "./math";
+import { beginDiagramPass, diagramHtml } from "./mermaid";
 
 interface RenderEnv {
   /** Folder of the open file, for resolving relative image paths. */
   baseDir: string | null;
+  /** Trusted HTML (math, diagrams) to put back after sanitizing; see `slot`. */
+  slots: string[];
+  slotKey: string;
+  diagrams: number;
   [key: string | symbol]: unknown;
 }
 
 const md = new MarkdownIt({ html: true, linkify: true });
 md.use(anchor, { tabIndex: false });
 md.use(taskLists);
+md.use(mathSyntax);
+
+/**
+ * KaTeX and Mermaid output needs the inline styles the sanitizer strips, and
+ * both libraries sanitize their own output. So the Markdown pass leaves an
+ * empty placeholder, and `renderMarkdown` swaps the real HTML in afterwards.
+ * The key is random per render, so HTML typed into a document cannot name one.
+ */
+function slot(env: RenderEnv, tag: "span" | "div", html: string): string {
+  env.slots.push(html);
+  return `<${tag} data-slot="${env.slotKey}-${env.slots.length - 1}"></${tag}>`;
+}
+
+const lineAttr = (token: Token) => {
+  const line = token.attrGet("data-line");
+  return line !== null ? ` data-line="${line}"` : "";
+};
+
+md.renderer.rules.math_inline = (tokens, idx, _options, env) => slot(env as RenderEnv, "span", mathHtml(tokens[idx].content, false));
+md.renderer.rules.math_block = (tokens, idx, _options, env) =>
+  `<div class="math-block"${lineAttr(tokens[idx])}>${slot(env as RenderEnv, "div", mathHtml(tokens[idx].content, true))}</div>\n`;
 
 // Tag every rendered block with its 0-based source line so the preview can be
 // scrolled in step with the editor (see scrollSync.ts).
@@ -30,15 +57,18 @@ md.core.ruler.push("source_lines", (state) => {
 // Fenced code: a header with the language label and a Copy button, then the
 // Shiki-highlighted body, or plain escaped text for untagged or unknown
 // languages (and while a grammar is still loading).
-md.renderer.rules.fence = (tokens, idx) => {
+md.renderer.rules.fence = (tokens, idx, _options, rawEnv) => {
   const token = tokens[idx];
   const tag = fenceTag(token.info);
+  const env = rawEnv as RenderEnv;
+  if (tag === "mermaid") {
+    return `<div class="mermaid-block"${lineAttr(token)}>${slot(env, "div", diagramHtml(token.content, env.diagrams++))}</div>\n`;
+  }
   const lang = languageForTag(tag);
   const body = highlightCode(token.content, tag) ?? escapeHtml(token.content.replace(/\n$/, ""));
   const label = escapeHtml(lang?.label ?? (tag || "Text"));
-  const line = token.attrGet("data-line");
   return (
-    `<div class="code-block"${line !== null ? ` data-line="${line}"` : ""}>` +
+    `<div class="code-block"${lineAttr(token)}>` +
     `<div class="code-head"><span class="code-lang">${label}</span>` +
     `<button type="button" class="code-copy">Copy</button></div>` +
     `<pre><code>${body}</code></pre></div>\n`
@@ -76,12 +106,20 @@ function resolveLocalSrc(src: string, baseDir: string | null): string {
 // local images on macOS.
 const ALLOWED_URI_REGEXP = /^(?:(?:https?|mailto|tel|asset|data):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i;
 
-/** Markdown → sanitized HTML for the preview. */
-export function renderMarkdown(source: string, baseDir: string | null): string {
-  const env: RenderEnv = { baseDir };
-  return DOMPurify.sanitize(md.render(source, env), {
+/**
+ * Markdown → sanitized HTML for the preview. `docKey` identifies the open
+ * document (a diagram being edited keeps showing its previous drawing); null,
+ * for exports, shows only finished output.
+ */
+export function renderMarkdown(source: string, baseDir: string | null, docKey: unknown = null): string {
+  beginDiagramPass(docKey);
+  const env: RenderEnv = { baseDir, slots: [], slotKey: crypto.randomUUID(), diagrams: 0 };
+  const html = DOMPurify.sanitize(md.render(source, env), {
     ALLOWED_URI_REGEXP,
     FORBID_TAGS: ["style", "form"],
     FORBID_ATTR: ["style"],
   });
+  if (!env.slots.length) return html;
+  const placeholder = new RegExp(`<(span|div) data-slot="${env.slotKey}-(\\d+)"></\\1>`, "g");
+  return html.replace(placeholder, (_all, _tag, i: string) => env.slots[Number(i)] ?? "");
 }

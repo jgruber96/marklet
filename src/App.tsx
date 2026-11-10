@@ -735,6 +735,7 @@ export default function App() {
             ref={preview}
             source={source}
             baseDir={dirOf(doc.path)}
+            docId={activeId.current}
             hidden={viewMode === "editor"}
             onRendered={() => scrollSync.current?.afterRender()}
             onOpenFile={(path) => void exclusive(() => openPath(path))}

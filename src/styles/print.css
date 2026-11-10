@@ -72,6 +72,17 @@
     display: none !important;
   }
 
+  /* Diagrams print in their light drawing, like everything else. */
+  :root:root .markdown-body .mermaid-diagram[data-scheme="light"] {
+    display: block !important;
+  }
+
+  :root:root .markdown-body .mermaid-diagram[data-scheme="dark"] {
+    display: none !important;
+  }
+
+  .markdown-body .mermaid-block,
+  .markdown-body .math-block,
   .markdown-body pre,
   .markdown-body blockquote,
   .markdown-body table,

@@ -9,6 +9,8 @@ import mono400 from "@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-n
 import mono700 from "@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2?inline";
 import { renderMarkdown } from "../preview/render";
 import { escapeHtml, highlightingIdle } from "../preview/highlight";
+import { embedsIdle } from "../preview/embeds";
+import { katexStandaloneCss } from "../preview/math";
 import { findHeadings } from "../sidebar/headings";
 import { dirOf, joinPath } from "../paths";
 import type { AccentSetting, ThemeSetting } from "../stores/settings";
@@ -42,7 +44,8 @@ function assetUrlToPath(src: string): string | null {
 /** Renders after loading every code grammar the document uses, so all blocks are colored. */
 async function renderComplete(source: string, baseDir: string | null): Promise<string> {
   renderMarkdown(source, baseDir);
-  await highlightingIdle();
+  // Math and diagrams load and draw in the background; the second pass has them all.
+  await Promise.all([highlightingIdle(), embedsIdle()]);
   return renderMarkdown(source, baseDir);
 }
 
@@ -87,6 +90,8 @@ export async function buildHtml(
       }
     }),
   );
+  // Math needs KaTeX's stylesheet and fonts; only documents that use it carry them.
+  const mathCss = body.querySelector(".katex") ? await katexStandaloneCss() : "";
   const holder = document.createElement("div");
   holder.append(body);
 
@@ -103,6 +108,7 @@ export async function buildHtml(
 ${themeCss}
 ${previewCss}
 ${EXPORT_CSS}
+${mathCss}
 </style>
 </head>
 <body>
@@ -126,8 +132,8 @@ export const pdfNeedsPath = !isMac;
  * writes `path` directly; macOS opens the print dialog.
  */
 export async function printPdf(path: string | null, title: string): Promise<void> {
-  await highlightingIdle();
-  // Let the preview re-render with every grammar loaded (it throttles at 40 ms).
+  await Promise.all([highlightingIdle(), embedsIdle()]);
+  // Let the preview re-render with every grammar, formula and diagram ready (it throttles at 40 ms).
   await new Promise((r) => setTimeout(r, 150));
   const previous = document.title;
   document.title = title.replace(/\.(md|markdown)$/i, ""); // the print dialog's default file name

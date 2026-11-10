@@ -4,6 +4,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { renderMarkdown } from "./render";
 import { onHighlighterChange } from "./highlight";
+import { onEmbedsChange } from "./embeds";
 import { isAbsolutePath, isMarkdownPath, joinPath } from "../paths";
 
 /** Longest a keystroke waits before the preview re-renders (brief: within 150 ms). */
@@ -17,6 +18,8 @@ export interface PreviewHandle {
 interface PreviewProps {
   source: string;
   baseDir: string | null;
+  /** Identifies the open document; changes when another tab is shown. */
+  docId: number;
   hidden: boolean;
   onRendered(): void;
   /** A link to another Markdown file was clicked. */
@@ -38,19 +41,22 @@ export const Preview = forwardRef<PreviewHandle, PreviewProps>(function Preview(
     if (timer.current !== null) return;
     timer.current = window.setTimeout(() => {
       timer.current = null;
-      const { source, baseDir, onRendered } = latest.current;
-      if (content.current) content.current.innerHTML = renderMarkdown(source, baseDir);
+      const { source, baseDir, docId, onRendered } = latest.current;
+      if (content.current) content.current.innerHTML = renderMarkdown(source, baseDir, docId);
       onRendered();
     }, RENDER_INTERVAL_MS);
   };
 
-  useEffect(scheduleRender, [props.source, props.baseDir]);
+  useEffect(scheduleRender, [props.source, props.baseDir, props.docId]);
 
   useEffect(() => {
     // A code block's grammar finished loading: re-render to color it.
     const unsubscribe = onHighlighterChange(scheduleRender);
+    // Likewise when math or a diagram is ready.
+    const unsubscribeEmbeds = onEmbedsChange(scheduleRender);
     return () => {
       unsubscribe();
+      unsubscribeEmbeds();
       if (timer.current !== null) clearTimeout(timer.current);
       timer.current = null;
     };

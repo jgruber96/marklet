@@ -13,6 +13,8 @@ A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Taur
 - **Tabs** with an unsaved dot, a save prompt on close, and session restore on the next launch
 - **Outline** of the current file's headings; click one to jump both panes there
 - **Syntax highlighting** for Markdown and for code in 12 languages, with the same colors in the editor and the preview
+- **Math**: `$…$` inline and `$$…$$` blocks, rendered with KaTeX
+- **Diagrams**: a `mermaid` code block renders as a diagram, redrawn as you type
 - **Formatting** buttons and shortcuts, plus autosave after 2 seconds idle
 - **Export** to a standalone HTML file or to PDF
 - **Light and dark** themes that follow the OS, with an override and six accent colors
@@ -86,6 +88,7 @@ Not yet run on a Mac. On macOS 13+ (Apple Silicon), check:
 - [x] 4. Workspace and tabs: folder tree with new/rename/delete, folder watcher, multiple tabs, session and window-size restore
 - [x] 5. Outline, toolbar and status bar: outline with jump and in-view highlight, formatting buttons and Ctrl/Cmd+B/I/K, autosave setting, status bar
 - [x] 6. Export and polish: HTML and PDF export, theme and accent settings, View menu, keyboard pass, file associations (tested on Windows; macOS checklist above)
+- [x] 7. Math and diagrams: KaTeX and Mermaid in the preview and in HTML and PDF export, loaded on first use
 
 ## License
 
