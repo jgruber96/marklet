@@ -22,13 +22,13 @@ A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Taur
 - **Find and replace** in the editor, with match case, whole word and regular expressions
 - **Formatting** buttons and shortcuts, plus autosave after 2 seconds idle
 - **Export** to a standalone HTML file or to PDF
-- **Light and dark** themes that follow the OS, with an override and six accent colors
+- **Light and dark** themes that follow the OS, with an override and six accent presets (Aurora by default), each with its own glow
 
 ## Screenshots
 
-| Light | Code and tables |
+| Light | Rich view |
 | --- | --- |
-| ![Split view in the light theme](docs/screenshots/split-light.png) | ![Highlighted TypeScript, a table and a blockquote in the dark theme](docs/screenshots/code-dark.png) |
+| ![Split view in the light theme](docs/screenshots/split-light.png) | ![Rich view in the dark theme: Markdown symbols hidden, task boxes and code drawn in place](docs/screenshots/rich-dark.png) |
 
 ## Prerequisites
 
@@ -117,6 +117,7 @@ Not yet run on a Mac. On macOS 13+ (Apple Silicon), check:
 - [x] 8. Image paste: pasted images saved beside the document in `assets/` and linked with a relative path
 - [x] 9. Spell check: the web view's checker on prose only, with a Settings toggle
 - [x] 10. Auto-update: signed updates from GitHub Releases, checked at startup and from the Settings menu
+- [x] 13. Aurora redesign: indigo surfaces, a three-color glow, pop colors for Markdown structure and icons, rounded tabs and an icon toolbar
 - [x] 12. Find and replace: a search bar above the editor, from Ctrl/Cmd+F or the Edit menu
 - [x] 11. Rich view: a fourth view mode that hides Markdown symbols away from the cursor and draws images, bullets, task boxes, tables, math and diagrams in place, with Ctrl/Cmd+click to follow links; raw HTML stays as source there
 
