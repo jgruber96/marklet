@@ -8,6 +8,7 @@ import type { EditorState, StateEffect } from "@codemirror/state";
 import { Editor, type EditorHandle } from "./lib/editor/Editor";
 import { type FormatKind, formatCommands } from "./lib/editor/format";
 import { saveImages } from "./lib/editor/images";
+import { setSpellCheck } from "./lib/editor/spellcheck";
 import { Sidebar } from "./lib/sidebar/Sidebar";
 import {
   type Doc,
@@ -28,6 +29,8 @@ import {
   flushSettings,
   isThemeSetting,
   loadAutosave,
+  loadSpellCheck,
+  saveSpellCheck,
   loadTheme,
   loadViewMode,
   saveAutosave,
@@ -265,6 +268,14 @@ export default function App() {
       if (!tab.dirty || !tab.doc.path || tab.missing || tab.autosaveFailed) continue;
       if (!(await saveTab(tab))) tab.autosaveFailed = true;
     }
+  };
+
+  const spellCheckOn = useRef(true);
+  const setSpellCheckSetting = async (on: boolean) => {
+    spellCheckOn.current = on;
+    setSpellCheck(on, editor.current?.view ?? null);
+    void setMenuChecked("spellcheck", on);
+    await saveSpellCheck(on);
   };
 
   const setAutosave = async (on: boolean) => {
@@ -528,8 +539,8 @@ export default function App() {
     for (const path of paths) await openPath(path);
   };
 
-  const actions = useRef({ commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, confirmDiscard, openFiles });
-  actions.current = { commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, confirmDiscard, openFiles };
+  const actions = useRef({ commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, setSpellCheckSetting, confirmDiscard, openFiles });
+  actions.current = { commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, setSpellCheckSetting, confirmDiscard, openFiles };
 
   // Serialize file actions so a second trigger can't open a second dialog. A
   // shortcut can arrive both as a keydown and as a menu accelerator, so the
@@ -593,6 +604,7 @@ export default function App() {
       else if (group === "accent" && isAccentSetting(value)) void actions.current.setAccent(value);
       else if (group === "view" && (value === "editor" || value === "split" || value === "preview")) actions.current.setViewMode(value);
       else if (id === "autosave") void actions.current.setAutosave(!autosaveOn.current);
+      else if (id === "spellcheck") void actions.current.setSpellCheckSetting(!spellCheckOn.current);
       else run(id);
     });
     const unwatch = listen<string[]>("fs-change", ({ payload }) => actions.current.onFsChange(payload));
@@ -621,6 +633,11 @@ export default function App() {
     void loadViewMode().then((mode) => {
       setViewModeState(mode);
       void checkMenuGroup("view", mode);
+    });
+    void loadSpellCheck().then((on) => {
+      spellCheckOn.current = on;
+      setSpellCheck(on, editor.current?.view ?? null);
+      void setMenuChecked("spellcheck", on);
     });
     void loadAutosave().then((on) => {
       autosaveOn.current = on;

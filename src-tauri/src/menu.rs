@@ -87,8 +87,16 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 
     let autosave = CheckMenuItemBuilder::with_id("autosave", "Autosave").checked(true).build(app)?;
     checks.push(("autosave".into(), autosave.clone()));
+    let spellcheck = CheckMenuItemBuilder::with_id("spellcheck", "Spell Check").checked(true).build(app)?;
+    checks.push(("spellcheck".into(), spellcheck.clone()));
     app.manage(CheckItems(checks));
-    let settings = SubmenuBuilder::new(app, "Settings").item(&theme).item(&accent).item(&autosave).build()?;
+    let settings = SubmenuBuilder::new(app, "Settings")
+        .item(&theme)
+        .item(&accent)
+        .separator()
+        .item(&autosave)
+        .item(&spellcheck)
+        .build()?;
 
     let menu = Menu::new(app)?;
     if cfg!(target_os = "macos") {
@@ -138,8 +146,9 @@ pub fn handle_event(app: &AppHandle, event: MenuEvent) {
             check_group(app, group, value);
         }
     }
-    // Autosave's tick is set by the front end (set_menu_checked) once it has
-    // flipped and saved the setting, so the two never disagree.
+    // The Autosave and Spell Check ticks are set by the front end
+    // (set_menu_checked) once it has flipped and saved the setting, so the two
+    // never disagree.
     let _ = app.emit("menu", id);
 }
 
@@ -159,7 +168,7 @@ pub fn check_menu_group(app: AppHandle, group: String, value: String) {
     check_group(&app, &group, &value);
 }
 
-/// Sets a check item's tick (used for Autosave).
+/// Sets a check item's tick (used for Autosave and Spell Check).
 #[tauri::command]
 pub fn set_menu_checked(app: AppHandle, id: String, checked: bool) {
     if let Some((_, item)) = app.state::<CheckItems>().0.iter().find(|(i, _)| *i == id) {

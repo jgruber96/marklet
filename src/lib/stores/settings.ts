@@ -11,7 +11,7 @@ const THEME_CACHE_KEY = "marklet:theme";
 const ACCENT_CACHE_KEY = "marklet:accent";
 
 let store: Promise<Store> | null = null;
-export const settingsStore = () => (store ??= load("settings.json", { defaults: { theme: "system", accent: "blue", autosave: true }, autoSave: 200 }));
+export const settingsStore = () => (store ??= load("settings.json", { defaults: { theme: "system", accent: "blue", autosave: true, spellcheck: true }, autoSave: 200 }));
 
 /** Applies the theme to the page and the native window chrome. */
 export function applyTheme(theme: ThemeSetting): void {
@@ -84,6 +84,17 @@ export async function loadAutosave(): Promise<boolean> {
 export async function saveAutosave(on: boolean): Promise<void> {
   if (!isTauri()) return;
   await (await settingsStore()).set("autosave", on);
+}
+
+/** Spell check in the editor; on by default. */
+export async function loadSpellCheck(): Promise<boolean> {
+  if (!isTauri()) return true;
+  return (await (await settingsStore()).get("spellcheck")) !== false;
+}
+
+export async function saveSpellCheck(on: boolean): Promise<void> {
+  if (!isTauri()) return;
+  await (await settingsStore()).set("spellcheck", on);
 }
 
 /** Ticks or unticks a native check menu item, such as Settings › Autosave. */

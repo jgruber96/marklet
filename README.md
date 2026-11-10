@@ -16,6 +16,7 @@ A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Taur
 - **Math**: `$…$` inline and `$$…$$` blocks, rendered with KaTeX
 - **Diagrams**: a `mermaid` code block renders as a diagram, redrawn as you type
 - **Image paste**: paste a screenshot or a copied image into the editor; it is saved in an `assets` folder next to the file and linked
+- **Spell check** in the editor with the system dictionaries, skipping code, links and HTML; turn it off in Settings
 - **Formatting** buttons and shortcuts, plus autosave after 2 seconds idle
 - **Export** to a standalone HTML file or to PDF
 - **Light and dark** themes that follow the OS, with an override and six accent colors
@@ -91,6 +92,7 @@ Not yet run on a Mac. On macOS 13+ (Apple Silicon), check:
 - [x] 6. Export and polish: HTML and PDF export, theme and accent settings, View menu, keyboard pass, file associations (tested on Windows; macOS checklist above)
 - [x] 7. Math and diagrams: KaTeX and Mermaid in the preview and in HTML and PDF export, loaded on first use
 - [x] 8. Image paste: pasted images saved beside the document in `assets/` and linked with a relative path
+- [x] 9. Spell check: the web view's checker on prose only, with a Settings toggle
 
 ## License
 

@@ -15,6 +15,7 @@ import { markdownHighlighting } from "./highlight";
 import { editorCodeLanguages } from "../languages";
 import { formatKeymap } from "./format";
 import { pastedImages } from "./images";
+import { spellCheck } from "./spellcheck";
 
 export interface EditorHandle {
   /** A fresh state (own undo history) for a tab that isn't shown yet. */
@@ -59,6 +60,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(prop
         EditorView.lineWrapping,
         markdown({ base: markdownLanguage, codeLanguages: editorCodeLanguages }),
         markdownHighlighting,
+        spellCheck,
         // Formatting first: Mod-i would otherwise select the parent syntax node.
         keymap.of([...formatKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap]),
         editorTheme,
