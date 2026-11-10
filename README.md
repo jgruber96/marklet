@@ -20,6 +20,7 @@ A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Taur
 - **Spell check** in the editor with the system dictionaries, skipping code, links and HTML; turn it off in Settings
 - **Auto-update**: checks for a new version at startup and installs it when you agree
 - **Find and replace** in the editor, with match case, whole word and regular expressions
+- **Crash recovery**: unsaved work, including notes never saved, is offered back if the app or PC goes down
 - **Formatting** buttons and shortcuts, plus autosave after 2 seconds idle
 - **Export** to a standalone HTML file or to PDF
 - **Light and dark** themes that follow the OS, with an override and six accent presets (Aurora by default), each with its own glow
@@ -60,7 +61,18 @@ Builds are unsigned, so Windows SmartScreen and macOS Gatekeeper warn on first l
 
 ## Releasing an update
 
-Installed copies check the newest GitHub release at startup (and from Settings › Check for Updates) and offer to install it. An update is only accepted if it was signed with the project's private update key, so a build needs that key:
+Installed copies check the newest GitHub release at startup (and from Settings › Check for Updates) and offer to install it. An update is only accepted if it was signed with the project's private update key, so a build needs that key.
+
+**Automated** (`.github/workflows/release.yml`): set the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, commit, then push a tag. GitHub builds, tests, signs and publishes the release; the tag's message becomes the release notes and the text of the update prompt.
+
+```bash
+git tag -a v0.4.0 -m "What changed"
+git push origin main v0.4.0
+```
+
+This needs the key stored once as the repository secret `TAURI_SIGNING_PRIVATE_KEY` (`gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/marklet.key`). Every push also runs the checks in `.github/workflows/ci.yml`: type check, front-end tests (`npm test`), production build and `cargo test`.
+
+**By hand**, on a PC that has the key file:
 
 1. Set the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`.
 2. Build with the key (PowerShell; the key file is kept outside the repo):
@@ -117,6 +129,8 @@ Not yet run on a Mac. On macOS 13+ (Apple Silicon), check:
 - [x] 8. Image paste: pasted images saved beside the document in `assets/` and linked with a relative path
 - [x] 9. Spell check: the web view's checker on prose only, with a Settings toggle
 - [x] 10. Auto-update: signed updates from GitHub Releases, checked at startup and from the Settings menu
+- [x] 15. Automated checks and releases: GitHub Actions run the tests on every push and build, sign and publish a release from a version tag
+- [x] 14. Crash recovery: unsaved work is kept in a recovery copy and offered back after an unclean exit
 - [x] 13. Aurora redesign: indigo surfaces, a three-color glow, pop colors for Markdown structure and icons, rounded tabs and an icon toolbar
 - [x] 12. Find and replace: a search bar above the editor, from Ctrl/Cmd+F or the Edit menu
 - [x] 11. Rich view: a fourth view mode that hides Markdown symbols away from the cursor and draws images, bullets, task boxes, tables, math and diagrams in place, with Ctrl/Cmd+click to follow links; raw HTML stays as source there

@@ -44,7 +44,7 @@ export function findHeadings(source: string): Heading[] {
     // A setext underline turns the paragraph line above it into a heading.
     const setext = SETEXT.exec(line);
     const prev = lines[i - 1];
-    if (setext && i > 0 && !PARAGRAPH_BREAKER.test(prev) && (i < 2 || /^\s*$/.test(lines[i - 2]) || ATX.test(lines[i - 2]))) {
+    if (setext && i > 0 && !PARAGRAPH_BREAKER.test(prev) && (i < 2 || /^\s*$/.test(lines[i - 2]) || ATX.test(lines[i - 2]) || FENCE.test(lines[i - 2]))) {
       out.push({ level: setext[1][0] === "=" ? 1 : 2, text: plain(prev), line: i - 1 });
     }
   }

@@ -1,0 +1,36 @@
+# Checks every push and pull request: types, front-end tests, production
+# build, and the Rust tests.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - name: Types and production build
+        run: npm run build
+      - name: Front-end tests
+        run: npm test
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml

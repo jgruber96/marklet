@@ -1,0 +1,91 @@
+# Builds, signs and publishes a release when a version tag is pushed:
+#
+#   git tag v0.4.0 && git push origin v0.4.0
+#
+# The tag must match the version in package.json, src-tauri/tauri.conf.json
+# and src-tauri/Cargo.toml. The release notes are the tag's message (use
+# `git tag -a v0.4.0 -m "What changed"`), or GitHub's generated notes.
+#
+# Needs one repository secret, TAURI_SIGNING_PRIVATE_KEY: the contents of the
+# update signing key (see README, "Releasing an update"). Installed copies only
+# accept updates signed with it.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the tag's message is the release notes
+
+      # The checkout keeps only the tagged commit; fetch the tag itself for its message.
+      - run: git fetch --force origin "refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}"
+        shell: bash
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+
+      - name: Check the tag against the app version
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(node -p "require('./package.json').version")
+          conf=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          cargo=$(grep -m1 '^version' src-tauri/Cargo.toml | cut -d'"' -f2)
+          echo "tag=$tag package.json=$pkg tauri.conf.json=$conf Cargo.toml=$cargo"
+          if [ "$tag" != "$pkg" ] || [ "$tag" != "$conf" ] || [ "$tag" != "$cargo" ]; then
+            echo "::error::The tag and the three version numbers must all match."
+            exit 1
+          fi
+
+      - name: Tests
+        run: |
+          npm test
+          cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build and sign the installers
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        shell: bash
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::The TAURI_SIGNING_PRIVATE_KEY secret is not set."
+            exit 1
+          fi
+          npm run tauri build
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # An annotated tag's message becomes the notes, in the release and in the update prompt.
+          notes=""
+          if [ "$(git cat-file -t "$GITHUB_REF_NAME")" = "tag" ]; then
+            notes=$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")
+          fi
+          node scripts/latest-json.mjs "$notes"
+          bundle=src-tauri/target/release/bundle
+          files=("$bundle/nsis/Marklet_${version}_x64-setup.exe" "$bundle/msi/Marklet_${version}_x64_en-US.msi" installers/latest.json)
+          if [ -n "$notes" ]; then
+            gh release create "$GITHUB_REF_NAME" "${files[@]}" --title "Marklet $version" --notes "$notes"
+          else
+            gh release create "$GITHUB_REF_NAME" "${files[@]}" --title "Marklet $version" --generate-notes
+          fi
