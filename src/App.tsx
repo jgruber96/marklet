@@ -10,6 +10,7 @@ import { type FormatKind, formatCommands } from "./lib/editor/format";
 import { saveImages } from "./lib/editor/images";
 import { setSpellCheck } from "./lib/editor/spellcheck";
 import { configureRich, setRich } from "./lib/editor/rich";
+import { openSearchPanel } from "@codemirror/search";
 import { checkForUpdate } from "./lib/update";
 import { Sidebar } from "./lib/sidebar/Sidebar";
 import {
@@ -538,6 +539,12 @@ export default function App() {
     "export-html": () => exportAs("html"),
     "export-pdf": () => exportAs("pdf"),
     "check-updates": () => checkForUpdate(true, readyToRestart),
+    find: async () => {
+      // The bar belongs to the editor, so bring the editor on screen first.
+      if (viewMode === "preview") setViewMode("split");
+      const view = editor.current?.view;
+      if (view) openSearchPanel(view);
+    },
   };
 
   /** Before an update restarts the app: every unsaved tab is saved or discarded, as on quit. */
@@ -601,7 +608,7 @@ export default function App() {
       let id: string | null;
       if (key === "tab" && e.ctrlKey) id = e.shiftKey ? "prev-tab" : "next-tab";
       else if (e.shiftKey) id = ({ s: "save-as", o: "open-folder", e: "export-html" } as Record<string, string>)[key] ?? null;
-      else id = ({ n: "new", o: "open", s: "save", w: "close-tab", p: "export-pdf" } as Record<string, string>)[key] ?? null;
+      else id = ({ n: "new", o: "open", s: "save", w: "close-tab", p: "export-pdf", f: "find", h: "find" } as Record<string, string>)[key] ?? null;
       if (!id) return;
       e.preventDefault();
       run(id);

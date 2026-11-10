@@ -10,6 +10,7 @@ import {
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
 import { editorTheme } from "./theme";
 import { markdownHighlighting } from "./highlight";
 import { editorCodeLanguages } from "../languages";
@@ -63,8 +64,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(prop
         markdownHighlighting,
         spellCheck,
         richView,
+        // Find and replace bar (Ctrl/Cmd+F) above the text.
+        search({ top: true }),
+        highlightSelectionMatches(),
         // Formatting first: Mod-i would otherwise select the parent syntax node.
-        keymap.of([...formatKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap]),
+        keymap.of([...formatKeymap, ...searchKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap]),
         editorTheme,
         EditorView.domEventHandlers({
           paste(event) {

@@ -101,6 +101,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .item(&item("check-updates", "Check for Updates…", None)?)
         .build()?;
 
+    let find = item("find", "Find and Replace…", Some("CmdOrCtrl+F"))?;
     let menu = Menu::new(app)?;
     if cfg!(target_os = "macos") {
         // macOS: settings live in the app menu, and an Edit menu is required
@@ -126,10 +127,13 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             .copy()
             .paste()
             .select_all()
+            .separator()
+            .item(&find)
             .build()?;
         menu.append_items(&[&app_menu, &file, &edit, &view])?;
     } else {
-        menu.append_items(&[&file, &view, &settings])?;
+        let edit = SubmenuBuilder::new(app, "Edit").item(&find).build()?;
+        menu.append_items(&[&file, &edit, &view, &settings])?;
     }
     Ok(menu)
 }
