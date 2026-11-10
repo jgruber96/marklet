@@ -62,14 +62,14 @@ export function Toolbar({ viewMode, onViewMode, onNew, onOpen, onOpenFolder, onF
 
   return (
     <div className="toolbar">
-      <button className="tb-btn" onClick={onNew} title={`New (${mod}N)`}>
-        <SquarePen size={16} /> New
+      <button className="tb-btn icon pop-pink" onClick={onNew} aria-label="New" title={`New (${mod}N)`}>
+        <SquarePen size={16} />
       </button>
-      <button className="tb-btn" onClick={onOpen} title={`Open file (${mod}O)`}>
-        <FileText size={16} /> Open
+      <button className="tb-btn icon pop-cyan" onClick={onOpen} aria-label="Open file" title={`Open file (${mod}O)`}>
+        <FileText size={16} />
       </button>
-      <button className="tb-btn" onClick={onOpenFolder} title={`Open folder (${mod}Shift+O)`}>
-        <FolderOpen size={16} /> Open Folder
+      <button className="tb-btn icon pop-amber" onClick={onOpenFolder} aria-label="Open folder" title={`Open folder (${mod}Shift+O)`}>
+        <FolderOpen size={16} />
       </button>
 
       <div className="tb-sep" />
@@ -107,10 +107,12 @@ export function Toolbar({ viewMode, onViewMode, onNew, onOpen, onOpenFolder, onF
       <button
         className="tb-btn"
         aria-haspopup="menu"
+        aria-label="Export"
         title={`Export as HTML (${mod}Shift+E) or PDF (${mod}P)`}
         onClick={(e) => void showExportMenu(e.currentTarget)}
       >
-        <Download size={16} /> Export <ChevronDown size={14} />
+        <Download size={16} />
+        <ChevronDown size={14} />
       </button>
     </div>
   );

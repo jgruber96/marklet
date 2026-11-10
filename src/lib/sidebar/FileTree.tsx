@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { Menu } from "@tauri-apps/api/menu";
-import { ChevronDown, ChevronRight, FilePlus, FileText } from "lucide-react";
+import { ChevronDown, ChevronRight, FilePlus, FileText, Folder, FolderOpen } from "lucide-react";
 import type { TreeNode } from "../stores/workspace";
 import { baseName, samePath } from "../paths";
 import { focusRow, moveFocus, syncTabStop } from "./roving";
@@ -144,9 +144,12 @@ export function FileTree(props: FileTreeProps) {
             onKeyDown={(e) => onRowKey(e, node)}
           >
             {node.isDir ? (
-              open ? <ChevronDown size={14} className="tree-icon" /> : <ChevronRight size={14} className="tree-icon" />
+              <>
+                {open ? <ChevronDown size={14} className="tree-icon" /> : <ChevronRight size={14} className="tree-icon" />}
+                {open ? <FolderOpen size={14} className="tree-icon folder" /> : <Folder size={14} className="tree-icon folder" />}
+              </>
             ) : (
-              <FileText size={14} className="tree-icon" />
+              <FileText size={14} className="tree-icon file" />
             )}
             <span className="tree-name">{node.name}</span>
           </div>
@@ -208,7 +211,7 @@ function NameInput({ depth, initial, isDir, onCommit, onCancel }: NameInputProps
 
   return (
     <div className="tree-row editing" style={{ paddingLeft: 8 + depth * INDENT }}>
-      {isDir ? <ChevronRight size={14} className="tree-icon" /> : <FileText size={14} className="tree-icon" />}
+      {isDir ? <Folder size={14} className="tree-icon folder" /> : <FileText size={14} className="tree-icon file" />}
       <input
         ref={input}
         className="tree-input"

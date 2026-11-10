@@ -26,7 +26,7 @@ export function StatusBar({ doc, dirty, autosave, line, col, selected, words }: 
       <span>
         {words.toLocaleString()} {words === 1 ? "word" : "words"}
       </span>
-      <span className={dirty ? "unsaved" : undefined}>{state}</span>
+      <span className={`save-state${dirty ? " unsaved" : doc.path ? "" : " fresh"}`}>{state}</span>
       <span title="Settings › Autosave">{autosave ? "Autosave on" : "Autosave off"}</span>
     </footer>
   );

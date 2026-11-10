@@ -482,16 +482,18 @@ const richTheme = EditorView.theme({
   "&.cm-rich .cm-rich-h4": { fontSize: "1em" },
   "&.cm-rich .cm-rich-h5": { fontSize: "0.875em" },
   "&.cm-rich .cm-rich-h6": { fontSize: "0.85em", color: "var(--muted)" },
+  // The document title shines, as in the preview.
+  "&.cm-rich .cm-rich-h1 span": { background: "var(--glow)", backgroundClip: "text", WebkitBackgroundClip: "text", color: "transparent" },
 
   "&.cm-rich .cm-line.cm-rich-quote": {
     marginLeft: "32px",
     paddingLeft: "1em",
-    borderLeft: "3px solid var(--border)",
+    borderLeft: "3px solid var(--glow-2)",
     color: "var(--muted)",
   },
-  ".cm-rich-bullet": { color: "var(--muted)" },
+  ".cm-rich-bullet": { color: "var(--marker)", fontWeight: "700" },
   ".cm-rich-task": { margin: "0 0.1em 0 0", verticalAlign: "-0.1em", accentColor: "var(--accent)", cursor: "pointer" },
-  ".cm-rich-rule": { display: "inline-block", width: "100%", height: "2px", verticalAlign: "middle", backgroundColor: "var(--border)" },
+  ".cm-rich-rule": { display: "inline-block", width: "100%", height: "2px", verticalAlign: "middle", borderRadius: "2px", background: "var(--glow)", opacity: "0.7" },
   ".cm-rich-image": { maxWidth: "100%", verticalAlign: "bottom", borderRadius: "4px" },
   // Overrides the preview pane's own page layout for .markdown-body.
   // (and the editor's pre-wrap, which would turn the HTML's line breaks into gaps).

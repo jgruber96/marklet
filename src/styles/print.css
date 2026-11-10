@@ -9,20 +9,27 @@
     color-scheme: light;
 
     --bg: #ffffff;
-    --bar: #f6f7f9;
-    --border: #e3e5e8;
-    --text: #1f2328;
-    --muted: #57606a;
+    --bar: #f1eefb;
+    --border: #e0d9f3;
+    --text: #221f33;
+    --muted: #6b6685;
     --accent: var(--accent-light);
-    --selected: #e8eef9;
-    --code-bg: #f6f8fa;
-    --current-line: #eef3fd;
+    --selected: #e4dcfa;
+    --code-bg: #f5f2fd;
+    --current-line: #f3eefe;
 
-    --tok-keyword: #cf222e;
-    --tok-string: #0a3069;
-    --tok-function: #8250df;
-    --tok-comment: #6e7781;
-    --tok-number: #0550ae;
+    --h1: #d6247a;
+    --h2: #7048e8;
+    --h3: #0b84a8;
+    --link: #0b7fb0;
+    --code-text: #c2255c;
+    --marker: #7048e8;
+
+    --tok-keyword: #d6336c;
+    --tok-string: #0b7285;
+    --tok-function: #7048e8;
+    --tok-comment: #8a86a3;
+    --tok-number: #d9480f;
   }
 
   @page {
@@ -35,12 +42,15 @@
   .app,
   .body,
   .panes {
+    box-shadow: none !important;
+    border-radius: 0 !important;
     display: block !important;
     height: auto !important;
     overflow: visible !important;
     background: #ffffff !important;
   }
 
+  .app::before,
   .toolbar,
   .tabstrip,
   .sidebar,

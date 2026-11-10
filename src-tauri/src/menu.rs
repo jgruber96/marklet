@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, Manager, Wry};
 
 const THEMES: [(&str, &str); 3] = [("system", "System"), ("light", "Light"), ("dark", "Dark")];
 const ACCENTS: [(&str, &str); 6] = [
-    ("blue", "Blue"),
+    ("blue", "Aurora"),
     ("purple", "Purple"),
     ("green", "Green"),
     ("orange", "Orange"),

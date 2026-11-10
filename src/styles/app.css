@@ -1,4 +1,4 @@
-/* Window layout: the five bands from the brief. Colors come from theme.css. */
+/* Window layout: toolbar, tab strip, sidebar + panes, status bar. Colors come from theme.css. */
 
 html,
 body,
@@ -27,10 +27,54 @@ button {
   outline-offset: -2px;
 }
 
+/* Slim, rounded scrollbars everywhere. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--muted) 35%, transparent);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+
+/*
+ * The chrome (toolbar, tabs, sidebar, status bar) is one surface: the bar
+ * color with a faint wash of the glow in three corners. The bands themselves
+ * are transparent, so there are no seams between them.
+ */
 .app {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
+  background:
+    radial-gradient(60% 340px at 0% 0%, color-mix(in srgb, var(--glow-1) var(--wash-strength), transparent), transparent 70%),
+    radial-gradient(55% 320px at 100% 0%, color-mix(in srgb, var(--glow-3) var(--wash-strength), transparent), transparent 70%),
+    radial-gradient(420px 60% at 0% 100%, color-mix(in srgb, var(--glow-2) var(--wash-strength), transparent), transparent 70%),
+    var(--bar);
+}
+
+/* A hairline of the glow along the top edge of the window. */
+.app::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 2;
+  height: 2px;
+  background: var(--glow);
+  pointer-events: none;
 }
 
 /* Toolbar */
@@ -38,26 +82,28 @@ button {
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   flex: none;
-  height: 44px;
-  padding: 0 10px;
-  background: var(--bar);
-  border-bottom: 1px solid var(--border);
+  height: 46px;
+  padding: 2px 12px 0;
 }
 
 .tb-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 28px;
-  min-width: 28px;
+  gap: 2px;
+  height: 30px;
+  min-width: 32px;
   padding: 0 8px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
+  color: var(--muted);
   cursor: pointer;
+  transition:
+    background-color 0.12s,
+    color 0.12s;
 }
 
 .tb-btn.icon {
@@ -65,20 +111,36 @@ button {
 }
 
 .tb-btn:hover:not(:disabled) {
-  background: var(--selected);
+  background: color-mix(in srgb, var(--selected) 80%, transparent);
+  color: var(--text);
 }
 
 .tb-btn:disabled {
-  color: var(--muted);
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
+}
+
+/* The three file buttons each carry one of the pop colors. */
+.tb-btn.pop-pink,
+.tb-btn.pop-pink:hover:not(:disabled) {
+  color: var(--pop-pink);
+}
+
+.tb-btn.pop-cyan,
+.tb-btn.pop-cyan:hover:not(:disabled) {
+  color: var(--pop-cyan);
+}
+
+.tb-btn.pop-amber,
+.tb-btn.pop-amber:hover:not(:disabled) {
+  color: var(--pop-amber);
 }
 
 .tb-sep {
   width: 1px;
-  height: 20px;
+  height: 18px;
   margin: 0 6px;
-  background: var(--border);
+  background: color-mix(in srgb, var(--muted) 30%, transparent);
 }
 
 .tb-spacer {
@@ -87,46 +149,54 @@ button {
 
 .segmented {
   display: inline-flex;
-  padding: 2px;
-  margin-right: 8px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--bar);
+  padding: 3px;
+  margin-right: 6px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--code-bg) 80%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
 }
 
 .segmented button {
   height: 24px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: none;
-  border-radius: 5px;
+  border-radius: 7px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
+  transition: color 0.12s;
+}
+
+.segmented button:hover {
+  color: var(--text);
 }
 
 .segmented button.active {
-  background: var(--bg);
-  color: var(--text);
-  box-shadow: 0 0 0 1px var(--border);
+  background: var(--glow);
+  color: #fff;
+  font-weight: 600;
+  text-shadow: 0 1px 1px rgb(0 0 0 / 25%);
+  box-shadow: 0 2px 10px -2px color-mix(in srgb, var(--glow-2) 70%, transparent);
 }
 
 .segmented button:disabled {
   cursor: default;
 }
 
-/* Tab strip */
+/* Tab strip: rounded tabs; the active one is lifted and underlined with the glow. */
 
 .tabstrip {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   flex: none;
-  height: 36px;
-  background: var(--bar);
-  border-bottom: 1px solid var(--border);
+  height: 38px;
+  padding: 0 8px 8px;
 }
 
 .tabs {
   display: flex;
+  align-items: center;
+  gap: 4px;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
@@ -137,22 +207,39 @@ button {
 }
 
 .tab {
+  position: relative;
   display: flex;
   flex: none;
   cursor: default;
   align-items: center;
   gap: 8px;
+  height: 30px;
   max-width: 240px;
-  padding: 0 6px 0 14px;
-  border-right: 1px solid var(--border);
+  padding: 0 6px 0 12px;
+  border-radius: 8px;
   color: var(--muted);
+  transition:
+    background-color 0.12s,
+    color 0.12s;
+}
+
+.tab:hover {
+  background: color-mix(in srgb, var(--selected) 55%, transparent);
+  color: var(--text);
 }
 
 .tab.active {
-  margin-bottom: -1px;
-  background: var(--bg);
+  background: var(--selected);
   color: var(--text);
-  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.tab.active::after {
+  content: "";
+  position: absolute;
+  inset: auto 12px 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--glow);
 }
 
 .tab-name {
@@ -166,7 +253,8 @@ button {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--pop-pink);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--pop-pink) 70%, transparent);
 }
 
 .tab-close,
@@ -177,20 +265,19 @@ button {
   width: 22px;
   height: 22px;
   border: none;
-  border-radius: 5px;
+  border-radius: 6px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
 }
 
 .tab-new {
-  align-self: center;
   margin-left: 6px;
 }
 
 .tab-close:hover,
 .tab-new:hover {
-  background: var(--selected);
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
   color: var(--text);
 }
 
@@ -207,7 +294,6 @@ button {
   flex-direction: column;
   flex: none;
   min-width: 0;
-  background: var(--bar);
 }
 
 .side-section {
@@ -218,22 +304,18 @@ button {
   overflow: auto;
 }
 
-.side-section + .side-section {
-  border-top: 1px solid var(--border);
-}
-
 .side-section h2 {
   margin: 0;
-  padding: 12px 14px 6px;
-  font-size: 11px;
+  padding: 14px 16px 6px;
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .side-empty {
-  padding: 4px 14px 12px;
+  padding: 4px 16px 12px;
   color: var(--muted);
 }
 
@@ -249,23 +331,25 @@ button {
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 26px;
+  height: 28px;
   padding-right: 8px;
 }
 
 .tree-root {
-  padding-left: 14px;
+  padding-left: 16px;
   font-weight: 600;
 }
 
 .tree-row {
+  margin: 1px 8px;
+  border-radius: 7px;
   color: var(--text);
   cursor: default;
   outline: none;
 }
 
 .tree-row:hover {
-  background: color-mix(in srgb, var(--selected) 60%, transparent);
+  background: color-mix(in srgb, var(--selected) 55%, transparent);
 }
 
 .tree-row.active,
@@ -274,12 +358,25 @@ button {
 }
 
 .tree-row:focus-visible {
-  box-shadow: inset 2px 0 0 var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .tree-icon {
   flex: none;
   color: var(--muted);
+}
+
+/* Folders in amber, notes in the accent, the open note in pink. */
+.tree-icon.folder {
+  color: var(--pop-amber);
+}
+
+.tree-icon.file {
+  color: var(--accent);
+}
+
+.tree-row.active .tree-icon.file {
+  color: var(--pop-pink);
 }
 
 .tree-name {
@@ -296,7 +393,7 @@ button {
   height: 20px;
   padding: 0 4px;
   border: 1px solid var(--accent);
-  border-radius: 3px;
+  border-radius: 4px;
   outline: none;
   background: var(--bg);
   color: var(--text);
@@ -312,14 +409,14 @@ button {
   width: 22px;
   height: 22px;
   border: none;
-  border-radius: 5px;
+  border-radius: 6px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
 }
 
 .icon-btn:hover {
-  background: var(--selected);
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
   color: var(--text);
 }
 
@@ -339,7 +436,7 @@ button {
   margin: 0 0 6px;
 }
 
-/* Outline */
+/* Outline: each level's marker takes that heading level's color. */
 
 .outline {
   display: flex;
@@ -348,10 +445,13 @@ button {
 }
 
 .outline-item {
+  position: relative;
   flex: none;
-  height: 26px;
+  height: 28px;
+  margin: 1px 8px;
   padding-right: 10px;
   border: none;
+  border-radius: 7px;
   background: transparent;
   color: var(--muted);
   text-align: left;
@@ -363,7 +463,7 @@ button {
 
 .outline-item:hover {
   color: var(--text);
-  background: color-mix(in srgb, var(--selected) 60%, transparent);
+  background: color-mix(in srgb, var(--selected) 55%, transparent);
 }
 
 .outline-item:focus-visible {
@@ -371,19 +471,33 @@ button {
 }
 
 .outline-item.active {
-  color: var(--accent);
+  color: var(--text);
   background: var(--selected);
-  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.outline-item.active::before {
+  content: "";
+  position: absolute;
+  inset: 7px auto 7px 3px;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--glow-1), var(--glow-2));
 }
 
 .outline-blank {
   font-style: italic;
 }
 
+/* The editor and preview: one sheet set into the chrome, rounded at its top-left corner. */
+
 .panes {
   display: flex;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  border-top-left-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 0 0 1px var(--border);
 }
 
 .pane {
@@ -398,7 +512,7 @@ button {
   background: var(--bg);
 }
 
-/* Draggable divider: a 1px border line with a wider invisible grab area. */
+/* Draggable divider: invisible beside the sidebar, a hairline between the panes; glows on hover. */
 
 .splitter {
   position: relative;
@@ -417,6 +531,10 @@ button {
   bottom: 0;
   left: 3px;
   width: 1px;
+  background: transparent;
+}
+
+.panes .splitter::after {
   background: var(--border);
 }
 
@@ -424,7 +542,7 @@ button {
 .splitter.dragging::after {
   left: 2px;
   width: 3px;
-  background: var(--accent);
+  background: linear-gradient(180deg, var(--glow-1), var(--glow-2), var(--glow-3));
 }
 
 body.resizing,
@@ -441,8 +559,6 @@ body.resizing * {
   flex: none;
   height: 26px;
   padding: 0 12px;
-  background: var(--bar);
-  border-top: 1px solid var(--border);
   color: var(--muted);
   font-size: 12px;
 }
@@ -451,6 +567,32 @@ body.resizing * {
   flex: 1;
 }
 
-.statusbar .unsaved {
-  color: var(--accent);
+/* Saved / unsaved: a small lit dot. */
+.statusbar .save-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statusbar .save-state::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--ok) 70%, transparent);
+}
+
+.statusbar .save-state.unsaved {
+  color: var(--pop-pink);
+}
+
+.statusbar .save-state.unsaved::before {
+  background: var(--pop-pink);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--pop-pink) 70%, transparent);
+}
+
+.statusbar .save-state.fresh::before {
+  background: var(--muted);
+  box-shadow: none;
 }

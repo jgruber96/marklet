@@ -15,7 +15,7 @@ export const editorTheme = EditorView.theme({
   },
   ".cm-content": {
     padding: "16px 0 40vh",
-    caretColor: "var(--accent)",
+    caretColor: "var(--pop-pink)",
   },
   ".cm-line": { padding: "0 24px 0 8px" },
   ".cm-gutters": {
@@ -28,10 +28,10 @@ export const editorTheme = EditorView.theme({
   ".cm-code-block": { backgroundColor: "var(--code-bg)" },
   ".cm-code-block.cm-activeLine": { backgroundColor: "var(--current-line)" },
   ".cm-activeLineGutter": { backgroundColor: "var(--current-line)" },
-  ".cm-activeLineGutter.cm-gutterElement": { color: "var(--text)", opacity: "1" },
-  ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--accent)", borderLeftWidth: "2px" },
+  ".cm-activeLineGutter.cm-gutterElement": { color: "var(--pop-pink)", opacity: "1", fontWeight: "700" },
+  ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--pop-pink)", borderLeftWidth: "2px" },
   // Find and replace bar.
-  ".cm-panels": { backgroundColor: "var(--bar)", color: "var(--text)", fontFamily: "var(--font-ui)", fontSize: "13px" },
+  ".cm-panels": { backgroundColor: "var(--current-line)", color: "var(--text)", fontFamily: "var(--font-ui)", fontSize: "13px" },
   ".cm-panels.cm-panels-top": { borderBottom: "1px solid var(--border)" },
   ".cm-panel.cm-search": { padding: "8px 32px 8px 12px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px" },
   ".cm-panel.cm-search br": { display: "none" },
@@ -45,7 +45,7 @@ export const editorTheme = EditorView.theme({
     color: "var(--text)",
     backgroundColor: "var(--bg)",
     border: "1px solid var(--border)",
-    borderRadius: "5px",
+    borderRadius: "7px",
   },
   ".cm-textfield:focus": { outline: "none", borderColor: "var(--accent)" },
   ".cm-button": {
@@ -56,7 +56,7 @@ export const editorTheme = EditorView.theme({
     backgroundColor: "var(--bg)",
     backgroundImage: "none",
     border: "1px solid var(--border)",
-    borderRadius: "5px",
+    borderRadius: "7px",
     cursor: "pointer",
     textTransform: "capitalize",
   },

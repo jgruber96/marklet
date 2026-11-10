@@ -12,19 +12,20 @@ import { tags as t } from "@lezer/highlight";
  */
 const style = HighlightStyle.define([
   // Markdown
-  { tag: t.heading1, fontWeight: "700", fontSize: "1.3em" },
-  { tag: t.heading2, fontWeight: "700", fontSize: "1.15em" },
-  { tag: [t.heading3, t.heading4, t.heading5, t.heading6], fontWeight: "700" },
+  { tag: t.heading1, fontWeight: "700", fontSize: "1.3em", color: "var(--h1)" },
+  { tag: t.heading2, fontWeight: "700", fontSize: "1.15em", color: "var(--h2)" },
+  { tag: t.heading3, fontWeight: "700", color: "var(--h3)" },
+  { tag: [t.heading4, t.heading5, t.heading6], fontWeight: "700" },
   { tag: t.strong, fontWeight: "700" },
   { tag: t.emphasis, fontStyle: "italic" },
   { tag: t.strikethrough, textDecoration: "line-through" },
-  { tag: t.link, color: "var(--accent)" },
+  { tag: t.link, color: "var(--link)" },
   { tag: t.url, color: "var(--muted)", textDecoration: "underline" },
-  { tag: t.monospace, backgroundColor: "var(--code-bg)", borderRadius: "3px" },
+  { tag: t.monospace, color: "var(--code-text)", backgroundColor: "var(--code-bg)", borderRadius: "3px" },
   { tag: t.quote, color: "var(--muted)", fontStyle: "italic" },
   { tag: t.contentSeparator, color: "var(--muted)" },
   // Syntax characters: #, **, _, [](), backticks, fences, >, list markers.
-  { tag: [t.processingInstruction, t.labelName], color: "var(--muted)", opacity: "0.65" },
+  { tag: [t.processingInstruction, t.labelName], color: "var(--marker)", opacity: "0.7" },
 
   // Code inside fenced blocks
   {

@@ -102,7 +102,7 @@ export async function setMenuChecked(id: string, checked: boolean): Promise<void
   if (isTauri()) await invoke("set_menu_checked", { id, checked });
 }
 
-/** Accent presets; the values live in theme.css. Blue is the brief's default. */
+/** Accent presets; the values live in theme.css. The default is stored as "blue" (the first version's default) and shown as Aurora. */
 export const ACCENTS = ["blue", "purple", "green", "orange", "pink", "teal"] as const;
 export type AccentSetting = (typeof ACCENTS)[number];
 export const isAccentSetting = (v: unknown): v is AccentSetting => ACCENTS.includes(v as AccentSetting);
