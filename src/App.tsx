@@ -7,6 +7,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { EditorState, StateEffect } from "@codemirror/state";
 import { Editor, type EditorHandle } from "./lib/editor/Editor";
 import { type FormatKind, formatCommands } from "./lib/editor/format";
+import { saveImages } from "./lib/editor/images";
 import { Sidebar } from "./lib/sidebar/Sidebar";
 import {
   type Doc,
@@ -449,6 +450,32 @@ export default function App() {
     await saveAccent(value);
   };
 
+  // ---- Pasted images ----
+
+  /** Saves pasted images beside the document and inserts their Markdown at the cursor. */
+  const pasteImages = async (files: File[]) => {
+    const tab = activeTab();
+    if (!tab || !isTauri()) return;
+    try {
+      if (!tab.doc.path) {
+        // The image path is relative to the file, so the file needs a place on disk first.
+        const save = await ask("Pasted images are saved in an assets folder next to the file. Save this file now?", {
+          title: "Marklet",
+          kind: "info",
+          okLabel: "Save",
+          cancelLabel: "Cancel",
+        });
+        if (!save || !(await saveTab(tab))) return;
+      }
+      const markdown = await saveImages(files, dirOf(tab.doc.path)!);
+      const view = editor.current?.view;
+      if (!view || tab.id !== activeId.current) return;
+      view.dispatch(view.state.replaceSelection(markdown), { scrollIntoView: true, userEvent: "input.paste" });
+    } catch (err) {
+      await showError(err);
+    }
+  };
+
   // ---- Export ----
 
   const exportAs = async (kind: ExportKind) => {
@@ -728,6 +755,7 @@ export default function App() {
                 scheduleAutosave();
               }}
               onCursor={(line, col, selected) => setCursor({ line, col, selected })}
+              onPasteImages={(files) => void exclusive(() => pasteImages(files), true)}
             />
           </section>
           {viewMode === "split" && <Splitter label="Resize editor and preview" onDrag={resizeSplit} />}

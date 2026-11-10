@@ -14,6 +14,7 @@ import { editorTheme } from "./theme";
 import { markdownHighlighting } from "./highlight";
 import { editorCodeLanguages } from "../languages";
 import { formatKeymap } from "./format";
+import { pastedImages } from "./images";
 
 export interface EditorHandle {
   /** A fresh state (own undo history) for a tab that isn't shown yet. */
@@ -28,6 +29,8 @@ interface EditorProps {
   onDocChange(text: string): void;
   /** Cursor position, and how many characters are selected. */
   onCursor(line: number, col: number, selected: number): void;
+  /** One or more images were pasted; the app saves them and inserts the Markdown. */
+  onPasteImages(files: File[]): void;
 }
 
 export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(props, ref) {
@@ -59,6 +62,15 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(prop
         // Formatting first: Mod-i would otherwise select the parent syntax node.
         keymap.of([...formatKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap]),
         editorTheme,
+        EditorView.domEventHandlers({
+          paste(event) {
+            const images = pastedImages(event.clipboardData);
+            if (!images.length) return false;
+            event.preventDefault();
+            callbacks.current.onPasteImages(images);
+            return true;
+          },
+        }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) callbacks.current.onDocChange(update.state.doc.toString());
           if (update.docChanged || update.selectionSet) reportCursor(update.state);

@@ -152,9 +152,77 @@ pub async fn trash_path(path: String) -> Result<(), String> {
     trash::delete(&path).map_err(|e| format!("Could not move {path} to the trash: {e}"))
 }
 
+/// Largest pasted image that is saved (before base64 encoding).
+const MAX_IMAGE_BYTES: usize = 25 * 1024 * 1024;
+
+/// A file name safe on Windows and macOS: no folders, no reserved characters.
+fn safe_file_name(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|c| if c.is_control() || r#"\/:*?"<>|"#.contains(c) { '-' } else { c })
+        .collect();
+    let cleaned = cleaned.trim().trim_matches('.').trim();
+    if cleaned.is_empty() { "image".into() } else { cleaned.to_string() }
+}
+
+/// Saves a pasted image (base64 `data`) into `dir`, creating the folder if
+/// needed. Never overwrites: a taken name gets `-1`, `-2`, … before the
+/// extension. Returns the file name used.
+#[tauri::command]
+pub async fn save_image(dir: String, name: String, data: String) -> Result<String, String> {
+    use base64::Engine;
+    use std::io::Write;
+
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data.as_bytes())
+        .map_err(|_| "The pasted image could not be read.".to_string())?;
+    if bytes.len() > MAX_IMAGE_BYTES {
+        return Err("That image is too large to paste (the limit is 25 MB).".into());
+    }
+    let folder = Path::new(&dir);
+    std::fs::create_dir_all(folder).map_err(|e| format!("Could not create {dir}: {e}"))?;
+
+    let name = safe_file_name(&name);
+    let as_path = Path::new(&name);
+    let stem = as_path.file_stem().and_then(|s| s.to_str()).unwrap_or("image").to_string();
+    let ext = as_path.extension().and_then(|e| e.to_str()).map(|e| format!(".{e}")).unwrap_or_default();
+    for n in 0..10_000 {
+        let candidate = if n == 0 { format!("{stem}{ext}") } else { format!("{stem}-{n}{ext}") };
+        // create_new fails if the name is taken, so two pastes can never collide.
+        match std::fs::OpenOptions::new().write(true).create_new(true).open(folder.join(&candidate)) {
+            Ok(mut file) => {
+                return file
+                    .write_all(&bytes)
+                    .map(|_| candidate)
+                    .map_err(|e| format!("Could not save the image: {e}"));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(format!("Could not save the image: {e}")),
+        }
+    }
+    Err("Could not find a free file name for the image.".into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pasted_images_get_safe_unique_names() {
+        use base64::Engine;
+        let dir = std::env::temp_dir().join("marklet-test-images").join("assets");
+        let _ = std::fs::remove_dir_all(dir.parent().unwrap());
+        let dir_s = dir.to_string_lossy().into_owned();
+        let data = base64::engine::general_purpose::STANDARD.encode(b"png-bytes");
+        let save = |name: &str| tauri::async_runtime::block_on(save_image(dir_s.clone(), name.into(), data.clone()));
+
+        assert_eq!(save("shot.png").unwrap(), "shot.png");
+        assert_eq!(save("shot.png").unwrap(), "shot-1.png");
+        assert_eq!(save("..\\..\\evil:name.png").unwrap(), "-..-evil-name.png");
+        assert_eq!(std::fs::read(dir.join("shot-1.png")).unwrap(), b"png-bytes");
+        assert!(tauri::async_runtime::block_on(save_image(dir_s.clone(), "x.png".into(), "not base64!".into())).is_err());
+        std::fs::remove_dir_all(dir.parent().unwrap()).unwrap();
+    }
 
     fn temp_path(name: &str) -> String {
         std::env::temp_dir().join(name).to_string_lossy().into_owned()

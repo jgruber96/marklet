@@ -50,6 +50,7 @@ fn main() {
             fs::create_file,
             fs::rename_path,
             fs::trash_path,
+            fs::save_image,
             watcher::watch_folder,
             watcher::unwatch_folder,
             menu::check_menu_group,
