@@ -4,7 +4,7 @@ A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Taur
 
 ![Marklet in dark mode: file tree and outline on the left, Markdown source and live preview side by side](docs/screenshots/split-dark.png)
 
-**[Download for Windows](https://github.com/jgruber96/marklet/releases/latest)** (installer under 5 MB). The macOS build is still to come.
+**[Download for Windows](https://github.com/jgruber96/marklet/releases/latest)** (installer about 7 MB). The macOS build is still to come.
 
 ## Features
 
