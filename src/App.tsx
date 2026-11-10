@@ -61,6 +61,7 @@ import {
   watchFolder,
 } from "./lib/stores/workspace";
 import { loadSession, saveSession } from "./lib/tabs/session";
+import { leftBehind, removeRecovery, writeRecovery } from "./lib/tabs/recovery";
 import { dirOf, isInside, joinPath, reroot, samePath, withMarkdownExt } from "./lib/paths";
 import { Preview, type PreviewHandle } from "./lib/preview/Preview";
 import { ScrollSync } from "./lib/preview/scrollSync";
@@ -86,6 +87,8 @@ interface Tab {
   missing: boolean;
   /** Autosave failed for this tab; it waits for a manual save so errors don't repeat. */
   autosaveFailed?: boolean;
+  /** The text in this tab's recovery copy, while it has one. */
+  recovered?: string;
 }
 
 export default function App() {
@@ -130,7 +133,86 @@ export default function App() {
 
   const updateDirty = (tab: Tab) => {
     tab.dirty = tab.missing || textOf(tab) !== tab.doc.savedText;
+    scheduleRecovery();
     render();
+  };
+
+  // ---- Crash recovery: a copy of every unsaved tab, removed again on a save, discard or clean exit ----
+
+  const recoveryTimer = useRef<number | undefined>(undefined);
+  /** Set once the app is on its way out, so a late timer cannot write copies back. */
+  const leaving = useRef(false);
+
+  /** Brings the copies in line with the tabs: one per unsaved tab, none for the rest. */
+  const syncRecovery = async () => {
+    if (leaving.current) return;
+    for (const tab of [...tabs.current]) {
+      const text = textOf(tab);
+      const unsaved = tab.missing || text !== tab.doc.savedText;
+      try {
+        if (unsaved && tab.recovered !== text) {
+          const { path, untitledName, lineEnding, bom } = tab.doc;
+          await writeRecovery(tab.id, { path, untitledName, text, lineEnding, bom });
+          tab.recovered = text;
+        } else if (!unsaved && tab.recovered !== undefined) {
+          await removeRecovery(tab.id);
+          tab.recovered = undefined;
+        }
+      } catch (err) {
+        console.warn(err); // Recovery is a safety net; it never gets in the way of editing.
+      }
+    }
+  };
+
+  const scheduleRecovery = () => {
+    clearTimeout(recoveryTimer.current);
+    recoveryTimer.current = window.setTimeout(() => void syncRecovery(), 800);
+  };
+
+  /** Removes the copies of tabs that are going away (closed, or the app is quitting). */
+  const forgetRecovery = async (list: Tab[]) => {
+    for (const tab of list) {
+      if (tab.recovered === undefined) continue;
+      tab.recovered = undefined;
+      await removeRecovery(tab.id).catch(console.warn);
+    }
+  };
+
+  /** At startup: offers back whatever an unclean exit left behind. */
+  const restoreLeftBehind = async () => {
+    const { copies, clear } = await leftBehind();
+    if (copies.length) {
+      const what = copies.length === 1 ? "the unsaved document" : `${copies.length} unsaved documents`;
+      const restore = await ask(`Marklet did not close properly last time. Restore ${what}?`, {
+        title: "Marklet",
+        kind: "warning",
+        okLabel: "Restore",
+        cancelLabel: "Discard",
+      });
+      if (restore) {
+        for (const copy of copies) {
+          let tab = copy.path ? findTab(copy.path) : undefined;
+          if (tab) {
+            replaceText(tab, copy.text);
+          } else if (copy.path) {
+            try {
+              tab = addTab((await readDoc(copy.path)).doc, copy.text);
+            } catch {
+              // The file itself is gone: the text comes back as an unsaved tab that saves to the old place.
+              tab = addTab({ path: copy.path, lineEnding: copy.lineEnding, bom: copy.bom, savedText: "", untitledName: "" }, copy.text);
+              tab.missing = true;
+            }
+          } else {
+            const taken = tabs.current.some((t) => !t.doc.path && !isPristine(t) && t.doc.untitledName === copy.untitledName);
+            tab = addTab(untitledDoc(taken || !copy.untitledName ? nextUntitledName() : copy.untitledName), copy.text);
+          }
+          updateDirty(tab);
+        }
+        // Copied again under this run before the old files go.
+        await syncRecovery();
+      }
+    }
+    await clear();
   };
 
   const persistSession = () => {
@@ -232,6 +314,7 @@ export default function App() {
   const dropTabs = (ids: number[]) => {
     const wasActive = ids.includes(activeId.current);
     const index = tabs.current.findIndex((t) => t.id === activeId.current);
+    void forgetRecovery(tabs.current.filter((t) => ids.includes(t.id)));
     tabs.current = tabs.current.filter((t) => !ids.includes(t.id));
     if (tabs.current.length === 0) addTab(untitledDoc(), "");
     else if (wasActive) show(tabs.current[Math.min(index, tabs.current.length - 1)].id);
@@ -556,7 +639,15 @@ export default function App() {
       if (!(await confirmDiscard(tab))) return false;
     }
     await flushSettings();
+    await leaveCleanly();
     return true;
+  };
+
+  /** The app is about to quit or restart with every tab saved or knowingly discarded: drop the recovery copies. */
+  const leaveCleanly = async () => {
+    leaving.current = true;
+    clearTimeout(recoveryTimer.current);
+    await forgetRecovery(tabs.current);
   };
 
   // Latest handlers for listeners registered once.
@@ -564,7 +655,7 @@ export default function App() {
     for (const path of paths) await openPath(path);
   };
 
-  const handlers = { commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, setSpellCheckSetting, confirmDiscard, openFiles, readyToRestart };
+  const handlers = { commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, setSpellCheckSetting, confirmDiscard, openFiles, readyToRestart, leaveCleanly };
   const actions = useRef(handlers);
   actions.current = handlers;
 
@@ -689,6 +780,7 @@ export default function App() {
       else show((opened.find((t) => front && samePath(t.doc.path!, front)) ?? opened[opened.length - 1]).id);
       // A file the app was launched to open (double-click) comes to the front.
       if (isTauri()) await openFiles(await invoke<string[]>("take_launch_files"));
+      await restoreLeftBehind();
     });
     // Look for a new version once the window has settled (installed builds only).
     if (!import.meta.env.DEV) {
@@ -724,6 +816,8 @@ export default function App() {
         for (const tab of [...tabs.current]) {
           if (!(await actions.current.confirmDiscard(tab))) return event.preventDefault();
         }
+        // Everything was saved or knowingly discarded: nothing to recover next time.
+        await actions.current.leaveCleanly();
         await flushSettings();
       } finally {
         busy.current = false;
