@@ -7,6 +7,7 @@
   padding: 24px 32px 40vh;
   color: var(--text);
   font: 15px/1.65 var(--font-ui);
+  font-size: calc(15px * var(--zoom, 1));
   user-select: text;
   overflow-wrap: break-word;
 }

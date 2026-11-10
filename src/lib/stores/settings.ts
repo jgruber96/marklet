@@ -144,3 +144,37 @@ export async function saveAccent(accent: AccentSetting): Promise<void> {
 export async function checkMenuGroup(group: string, value: string): Promise<void> {
   if (isTauri()) await invoke("check_menu_group", { group, value });
 }
+
+/** Text size steps for the editor and preview (View › Zoom In / Zoom Out). */
+export const ZOOM_STEPS = [0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+
+/** The editor and preview sizes are multiplied by --zoom (lib/editor/theme.ts, styles/preview.css). */
+export function applyZoom(zoom: number): void {
+  document.documentElement.style.setProperty("--zoom", String(zoom));
+}
+
+export async function loadZoom(): Promise<number> {
+  if (!isTauri()) return 1;
+  const v = await (await settingsStore()).get("zoom");
+  return typeof v === "number" && ZOOM_STEPS.includes(v) ? v : 1;
+}
+
+export async function saveZoom(zoom: number): Promise<void> {
+  if (isTauri()) await (await settingsStore()).set("zoom", zoom);
+}
+
+/** How many files File › Open Recent remembers. */
+export const RECENT_LIMIT = 10;
+
+export async function loadRecent(): Promise<string[]> {
+  if (!isTauri()) return [];
+  const v = await (await settingsStore()).get("recent");
+  return Array.isArray(v) ? v.filter((p): p is string => typeof p === "string").slice(0, RECENT_LIMIT) : [];
+}
+
+/** Stores the list and refills the Open Recent menu. */
+export async function saveRecent(files: string[]): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("set_recent_menu", { files });
+  await (await settingsStore()).set("recent", files);
+}

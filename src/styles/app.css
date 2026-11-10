@@ -596,3 +596,102 @@ body.resizing * {
   background: var(--muted);
   box-shadow: none;
 }
+
+/* Folder search: a box above the tree; its results take the tree's place. */
+
+.side-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 28px;
+  margin: 2px 10px 8px;
+  padding: 0 4px 0 9px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 80%, transparent);
+  color: var(--muted);
+}
+
+.side-search:focus-within {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.side-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  user-select: text;
+}
+
+.side-search input::placeholder {
+  color: var(--muted);
+}
+
+.side-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.search-results {
+  flex: 1;
+  padding-bottom: 8px;
+}
+
+.search-summary {
+  padding: 0 16px 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.search-file {
+  padding: 6px 16px 2px;
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.search-hit {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: calc(100% - 16px);
+  height: 26px;
+  margin: 1px 8px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-hit:hover {
+  background: color-mix(in srgb, var(--selected) 55%, transparent);
+  color: var(--text);
+}
+
+.search-line {
+  flex: none;
+  min-width: 2ch;
+  color: var(--marker);
+  font: 11px var(--font-mono);
+  text-align: right;
+}
+
+.search-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.search-text mark {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--pop-amber) 35%, transparent);
+  color: var(--text);
+}

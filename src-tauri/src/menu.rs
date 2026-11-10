@@ -1,7 +1,7 @@
 //! Native menu bar. Items are forwarded to the front end as a `menu` event
 //! carrying the item id; the front end owns documents, dialogs and settings.
 
-use tauri::menu::{CheckMenuItem, CheckMenuItemBuilder, Menu, MenuEvent, MenuItemBuilder, SubmenuBuilder};
+use tauri::menu::{CheckMenuItem, CheckMenuItemBuilder, Menu, MenuEvent, MenuItemBuilder, PredefinedMenuItem, Submenu, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, Wry};
 
 const THEMES: [(&str, &str); 3] = [("system", "System"), ("light", "Light"), ("dark", "Dark")];
@@ -27,6 +27,9 @@ const RADIO_GROUPS: [&str; 3] = ["theme", "accent", "view"];
 /// so their ticks can follow the front end's settings.
 pub struct CheckItems(Vec<(String, CheckMenuItem<Wry>)>);
 
+/// File › Open Recent, refilled by the front end (`set_recent_menu`).
+pub struct RecentMenu(Submenu<Wry>);
+
 pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let item = |id: &str, label: &str, accel: Option<&str>| {
         let b = MenuItemBuilder::with_id(id, label);
@@ -50,9 +53,14 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let quit_label = if cfg!(target_os = "macos") { "Quit Marklet" } else { "Exit" };
     let quit_accel = if cfg!(target_os = "macos") { Some("CmdOrCtrl+Q") } else { None };
 
+    let recent = SubmenuBuilder::new(app, "Open Recent").build()?;
+    fill_recent(app, &recent, &[])?;
+    app.manage(RecentMenu(recent.clone()));
+
     let mut file = SubmenuBuilder::new(app, "File")
         .item(&item("new", "New", Some("CmdOrCtrl+N"))?)
         .item(&item("open", "Open…", Some("CmdOrCtrl+O"))?)
+        .item(&recent)
         .item(&item("open-folder", "Open Folder…", Some("CmdOrCtrl+Shift+O"))?)
         .item(&item("close-folder", "Close Folder", None)?)
         .separator()
@@ -72,7 +80,12 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     for (value, label, accel) in VIEWS {
         view = view.item(&radio("view", value, label, Some(accel), value == "split")?);
     }
-    let view = view.build()?;
+    let view = view
+        .separator()
+        .item(&item("zoom-in", "Zoom In", Some("CmdOrCtrl+="))?)
+        .item(&item("zoom-out", "Zoom Out", Some("CmdOrCtrl+-"))?)
+        .item(&item("zoom-reset", "Actual Size", Some("CmdOrCtrl+0"))?)
+        .build()?;
 
     let mut theme = SubmenuBuilder::new(app, "Theme");
     for (value, label) in THEMES {
@@ -102,6 +115,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .build()?;
 
     let find = item("find", "Find and Replace…", Some("CmdOrCtrl+F"))?;
+    let find_in_folder = item("find-in-folder", "Find in Folder…", Some("CmdOrCtrl+Shift+F"))?;
     let menu = Menu::new(app)?;
     if cfg!(target_os = "macos") {
         // macOS: settings live in the app menu, and an Edit menu is required
@@ -129,13 +143,33 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             .select_all()
             .separator()
             .item(&find)
+            .item(&find_in_folder)
             .build()?;
         menu.append_items(&[&app_menu, &file, &edit, &view])?;
     } else {
-        let edit = SubmenuBuilder::new(app, "Edit").item(&find).build()?;
+        let edit = SubmenuBuilder::new(app, "Edit").item(&find).item(&find_in_folder).build()?;
         menu.append_items(&[&file, &edit, &view, &settings])?;
     }
     Ok(menu)
+}
+
+/// Refills Open Recent: one item per file (`recent:<index>`), then Clear Recent.
+fn fill_recent(app: &AppHandle, menu: &Submenu<Wry>, files: &[String]) -> tauri::Result<()> {
+    while menu.remove_at(0)?.is_some() {}
+    if files.is_empty() {
+        return menu.append(&MenuItemBuilder::with_id("recent:none", "No Recent Files").enabled(false).build(app)?);
+    }
+    for (i, path) in files.iter().enumerate() {
+        // "&" would otherwise mark a keyboard mnemonic on Windows.
+        menu.append(&MenuItemBuilder::with_id(format!("recent:{i}"), path.replace('&', "&&")).build(app)?)?;
+    }
+    menu.append(&PredefinedMenuItem::separator(app)?)?;
+    menu.append(&MenuItemBuilder::with_id("recent:clear", "Clear Recent").build(app)?)
+}
+
+#[tauri::command]
+pub fn set_recent_menu(app: AppHandle, files: Vec<String>) -> Result<(), String> {
+    fill_recent(&app, &app.state::<RecentMenu>().0, &files).map_err(|e| e.to_string())
 }
 
 pub fn handle_event(app: &AppHandle, event: MenuEvent) {

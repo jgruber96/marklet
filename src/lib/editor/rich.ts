@@ -465,7 +465,7 @@ const mono = { fontFamily: "var(--font-mono)", fontSize: "0.86em" };
 /** Typography that follows the preview (styles/preview.css). */
 const richTheme = EditorView.theme({
   "&.cm-rich .cm-gutters": { display: "none" },
-  "&.cm-rich .cm-scroller": { fontFamily: "var(--font-ui)", fontSize: "15px" },
+  "&.cm-rich .cm-scroller": { fontFamily: "var(--font-ui)", fontSize: "calc(15px * var(--zoom, 1))" },
   "&.cm-rich .cm-content": { maxWidth: "820px", margin: "0 auto", padding: "24px 0 40vh" },
   "&.cm-rich .cm-line": { padding: "0 32px" },
   "&.cm-rich .cm-activeLine": { backgroundColor: "transparent" },

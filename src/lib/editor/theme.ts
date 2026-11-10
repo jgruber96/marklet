@@ -6,7 +6,7 @@ export const editorTheme = EditorView.theme({
     height: "100%",
     backgroundColor: "var(--bg)",
     color: "var(--text)",
-    fontSize: "14px",
+    fontSize: "calc(14px * var(--zoom, 1))",
   },
   "&.cm-focused": { outline: "none" },
   ".cm-scroller": {

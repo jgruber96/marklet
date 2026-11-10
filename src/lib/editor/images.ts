@@ -54,8 +54,20 @@ export async function saveImages(files: File[], docDir: string): Promise<string>
   const now = new Date();
   const lines: string[] = [];
   for (const file of files) {
-    const saved = await invoke<string>("save_image", { dir: folder, name: fileNameFor(file, now), data: await toBase64(file) });
-    lines.push(`![](${encodeURI(`${IMAGE_FOLDER}/${saved}`).replace(/[()]/g, escape)})`);
+    lines.push(link(await invoke<string>("save_image", { dir: folder, name: fileNameFor(file, now), data: await toBase64(file) })));
   }
+  return lines.join("\n");
+}
+
+const link = (saved: string) => `![](${encodeURI(`${IMAGE_FOLDER}/${saved}`).replace(/[()]/g, escape)})`;
+
+/** Image files that can be dropped onto the editor. */
+export const isImagePath = (path: string) => /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(path);
+
+/** Copies dropped image files into the `assets` folder beside the document; returns the Markdown that shows them. */
+export async function importImages(paths: string[], docDir: string): Promise<string> {
+  const folder = joinPath(docDir, IMAGE_FOLDER);
+  const lines: string[] = [];
+  for (const source of paths) lines.push(link(await invoke<string>("import_image", { dir: folder, source })));
   return lines.join("\n");
 }

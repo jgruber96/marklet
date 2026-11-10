@@ -2,12 +2,15 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { EditorView } from "@codemirror/view";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { EditorState, StateEffect } from "@codemirror/state";
 import { Editor, type EditorHandle } from "./lib/editor/Editor";
 import { type FormatKind, formatCommands } from "./lib/editor/format";
-import { saveImages } from "./lib/editor/images";
+import { importImages, isImagePath, saveImages } from "./lib/editor/images";
+import type { SearchHit } from "./lib/sidebar/FolderSearch";
 import { setSpellCheck } from "./lib/editor/spellcheck";
 import { configureRich, setRich } from "./lib/editor/rich";
 import { openSearchPanel } from "@codemirror/search";
@@ -36,6 +39,13 @@ import {
   saveSpellCheck,
   loadTheme,
   isViewMode,
+  RECENT_LIMIT,
+  ZOOM_STEPS,
+  applyZoom,
+  loadRecent,
+  loadZoom,
+  saveRecent,
+  saveZoom,
   loadViewMode,
   saveAutosave,
   saveTheme,
@@ -62,7 +72,7 @@ import {
 } from "./lib/stores/workspace";
 import { loadSession, saveSession } from "./lib/tabs/session";
 import { leftBehind, removeRecovery, writeRecovery } from "./lib/tabs/recovery";
-import { dirOf, isInside, joinPath, reroot, samePath, withMarkdownExt } from "./lib/paths";
+import { dirOf, isInside, isMarkdownPath, joinPath, reroot, samePath, withMarkdownExt } from "./lib/paths";
 import { Preview, type PreviewHandle } from "./lib/preview/Preview";
 import { ScrollSync } from "./lib/preview/scrollSync";
 import { Toolbar } from "./components/Toolbar";
@@ -117,6 +127,10 @@ export default function App() {
   const [split, setSplit] = useState(0.5);
   const [viewMode, setViewModeState] = useState<ViewMode>("split");
   const [source, setSource] = useState("");
+  const [zoom, setZoomState] = useState(1);
+  const [searchFocus, setSearchFocus] = useState(0);
+  /** File › Open Recent, most recent first. */
+  const recent = useRef<string[]>([]);
 
   const activeTab = (): Tab | undefined => tabs.current.find((t) => t.id === activeId.current);
   // The Rich view shows images in place and needs the open file's folder (reads refs, so it stays current).
@@ -270,15 +284,54 @@ export default function App() {
 
   const newTab = () => addTab(untitledDoc(nextUntitledName()), "", { replacePristine: false });
 
-  const openPath = async (path: string) => {
+  const setRecent = (files: string[]) => {
+    recent.current = files;
+    void saveRecent(files).catch(console.warn);
+  };
+
+  /** Puts a file at the top of Open Recent. */
+  const noteRecent = (path: string) => {
+    if (recent.current[0] === path) return;
+    setRecent([path, ...recent.current.filter((p) => !samePath(p, path))].slice(0, RECENT_LIMIT));
+  };
+
+  /** Opens a file in a tab (or shows its tab); false if it could not be read. */
+  const openPath = async (path: string): Promise<boolean> => {
     const existing = findTab(path);
-    if (existing) return show(existing.id);
+    if (existing) {
+      show(existing.id);
+      return true;
+    }
     try {
       const { doc, text } = await readDoc(path);
       addTab(doc, text);
+      noteRecent(path);
+      return true;
     } catch (err) {
       await showError(err);
+      return false;
     }
+  };
+
+  /** A result of the folder search: opens the file with the match selected. */
+  const openHit = async (hit: SearchHit) => {
+    if (!(await openPath(hit.path))) return;
+    const view = editor.current?.view;
+    if (!view) return;
+    if (viewMode === "preview") setViewMode("split");
+    const line = view.state.doc.line(Math.min(hit.line + 1, view.state.doc.lines));
+    const from = Math.min(line.from + hit.column, line.to);
+    view.dispatch({
+      selection: { anchor: from, head: Math.min(from + hit.length, line.to) },
+      effects: EditorView.scrollIntoView(from, { y: "center" }),
+    });
+    view.focus();
+  };
+
+  /** An entry of File › Open Recent; one that no longer opens is dropped from the list. */
+  const openRecent = async (index: number) => {
+    const path = recent.current[index];
+    if (path && !(await openPath(path))) setRecent(recent.current.filter((p) => p !== path));
   };
 
   /** Saves a tab; returns false if the save was cancelled or failed. */
@@ -293,6 +346,7 @@ export default function App() {
       return false;
     }
     tab.doc = { ...tab.doc, path, savedText: text };
+    noteRecent(path);
     tab.missing = false;
     tab.autosaveFailed = false;
     updateDirty(tab);
@@ -556,13 +610,20 @@ export default function App() {
   // ---- Pasted images ----
 
   /** Saves pasted images beside the document and inserts their Markdown at the cursor. */
-  const pasteImages = async (files: File[]) => {
+  const pasteImages = (files: File[]) => insertImages((dir) => saveImages(files, dir));
+
+  /**
+   * Adds pasted or dropped images to the front tab: `store` puts them in the
+   * assets folder and returns their Markdown, which goes in at `at` (a place
+   * in the window, for a drop) or at the cursor.
+   */
+  const insertImages = async (store: (docDir: string) => Promise<string>, at?: { x: number; y: number }) => {
     const tab = activeTab();
     if (!tab || !isTauri()) return;
     try {
       if (!tab.doc.path) {
         // The image path is relative to the file, so the file needs a place on disk first.
-        const save = await ask("Pasted images are saved in an assets folder next to the file. Save this file now?", {
+        const save = await ask("Images are saved in an assets folder next to the file. Save this file now?", {
           title: "Marklet",
           kind: "info",
           okLabel: "Save",
@@ -570,13 +631,58 @@ export default function App() {
         });
         if (!save || !(await saveTab(tab))) return;
       }
-      const markdown = await saveImages(files, dirOf(tab.doc.path)!);
+      const markdown = await store(dirOf(tab.doc.path)!);
       const view = editor.current?.view;
       if (!view || tab.id !== activeId.current) return;
+      const pos = at ? view.posAtCoords(at) : null;
+      if (pos !== null) view.dispatch({ selection: { anchor: pos } });
       view.dispatch(view.state.replaceSelection(markdown), { scrollIntoView: true, userEvent: "input.paste" });
+      view.focus();
     } catch (err) {
       await showError(err);
     }
+  };
+
+  /** Files dropped on the window: notes open, a folder becomes the workspace, images go into the note. */
+  const dropped = async (paths: string[], at: { x: number; y: number }) => {
+    const images: string[] = [];
+    for (const path of paths) {
+      if (isMarkdownPath(path)) await openPath(path);
+      else if (isImagePath(path)) images.push(path);
+      else if ((await invoke<string>("path_kind", { path })) === "dir") await setWorkspace(path);
+    }
+    if (images.length) await insertImages((dir) => importImages(images, dir), at);
+  };
+
+  /** Puts the cursor in the sidebar's search box (not a file action: those hand focus back to the editor). */
+  const findInFolder = () => {
+    if (root.current) return setSearchFocus((n) => n + 1);
+    // Nothing to search yet: pick a folder first, then the box is ready.
+    void exclusive(async () => {
+      const dir = await pickFolder();
+      if (!dir) return;
+      await setWorkspace(dir);
+      setSearchFocus((n) => n + 1);
+    }, true);
+  };
+
+  // ---- Zoom ----
+
+  const lastZoom = useRef(0);
+  /** One step larger (1) or smaller (-1), or back to 100% (0). */
+  const stepZoom = (step: 1 | -1 | 0) => {
+    // A shortcut arrives twice, from the menu accelerator and from the page; count it once.
+    const now = performance.now();
+    if (now - lastZoom.current < 80) return;
+    lastZoom.current = now;
+    setZoomState((current) => {
+      const i = ZOOM_STEPS.indexOf(current);
+      const next = step === 0 ? 1 : ZOOM_STEPS[clamp((i < 0 ? ZOOM_STEPS.indexOf(1) : i) + step, 0, ZOOM_STEPS.length - 1)];
+      applyZoom(next);
+      void saveZoom(next);
+      editor.current?.view?.requestMeasure();
+      return next;
+    });
   };
 
   // ---- Export ----
@@ -655,7 +761,7 @@ export default function App() {
     for (const path of paths) await openPath(path);
   };
 
-  const handlers = { commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, setSpellCheckSetting, confirmDiscard, openFiles, readyToRestart, leaveCleanly };
+  const handlers = { commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, setSpellCheckSetting, confirmDiscard, openFiles, readyToRestart, leaveCleanly, stepZoom, dropped, openRecent, setRecent, findInFolder };
   const actions = useRef(handlers);
   actions.current = handlers;
 
@@ -699,6 +805,15 @@ export default function App() {
         e.preventDefault();
         return actions.current.setViewMode(view);
       }
+      const zoomStep = ({ "=": 1, "+": 1, "-": -1, "0": 0 } as Record<string, 1 | -1 | 0>)[e.key];
+      if (zoomStep !== undefined) {
+        e.preventDefault();
+        return actions.current.stepZoom(zoomStep);
+      }
+      if (key === "f" && e.shiftKey) {
+        e.preventDefault();
+        return actions.current.findInFolder();
+      }
       let id: string | null;
       if (key === "tab" && e.ctrlKey) id = e.shiftKey ? "prev-tab" : "next-tab";
       else if (e.shiftKey) id = ({ s: "save-as", o: "open-folder", e: "export-html" } as Record<string, string>)[key] ?? null;
@@ -720,6 +835,10 @@ export default function App() {
       if (group === "theme" && isThemeSetting(value)) void actions.current.setTheme(value);
       else if (group === "accent" && isAccentSetting(value)) void actions.current.setAccent(value);
       else if (group === "view" && isViewMode(value)) actions.current.setViewMode(value);
+      else if (group === "recent" && value === "clear") actions.current.setRecent([]);
+      else if (group === "recent") void exclusive(() => actions.current.openRecent(Number(value)));
+      else if (id === "zoom-in" || id === "zoom-out" || id === "zoom-reset") actions.current.stepZoom(id === "zoom-in" ? 1 : id === "zoom-out" ? -1 : 0);
+      else if (id === "find-in-folder") actions.current.findInFolder();
       else if (id === "autosave") void actions.current.setAutosave(!autosaveOn.current);
       else if (id === "spellcheck") void actions.current.setSpellCheckSetting(!spellCheckOn.current);
       else run(id);
@@ -727,7 +846,14 @@ export default function App() {
     const unwatch = listen<string[]>("fs-change", ({ payload }) => actions.current.onFsChange(payload));
     // Files double-clicked in Explorer or Finder while the app is running.
     const unopen = listen<string[]>("open-files", ({ payload }) => void exclusive(() => actions.current.openFiles(payload), true));
+    // Files and folders dragged onto the window. Positions arrive in device pixels.
+    const undrop = getCurrentWebview().onDragDropEvent(({ payload }) => {
+      if (payload.type !== "drop") return;
+      const at = { x: payload.position.x / window.devicePixelRatio, y: payload.position.y / window.devicePixelRatio };
+      void exclusive(() => actions.current.dropped(payload.paths, at), true);
+    });
     return () => {
+      void undrop.then((fn) => fn());
       void unlisten.then((fn) => fn());
       void unwatch.then((fn) => fn());
       void unopen.then((fn) => fn());
@@ -750,6 +876,15 @@ export default function App() {
     void loadViewMode().then((mode) => {
       setViewModeState(mode);
       void checkMenuGroup("view", mode);
+    });
+    void loadZoom().then((value) => {
+      applyZoom(value);
+      setZoomState(value);
+      editor.current?.view?.requestMeasure();
+    });
+    void loadRecent().then((files) => {
+      // Refill the menu; anything opened in the meantime stays on top.
+      setRecent([...recent.current, ...files.filter((f) => !recent.current.some((r) => samePath(r, f)))].slice(0, RECENT_LIMIT));
     });
     void loadSpellCheck().then((on) => {
       spellCheckOn.current = on;
@@ -876,6 +1011,8 @@ export default function App() {
           onReveal={(path) => void revealItemInDir(path)}
           onEscape={() => editor.current?.focus()}
           outline={{ source, topLine: outlineTopLine, onScroll: onOutlineScroll, onJump: jumpToLine }}
+          searchFocus={searchFocus}
+          onOpenHit={(hit) => void exclusive(() => openHit(hit))}
         />
         <Splitter label="Resize sidebar" onDrag={(x) => setSidebarWidth(clamp(x, SIDEBAR_MIN, SIDEBAR_MAX))} />
 
@@ -913,7 +1050,7 @@ export default function App() {
         </div>
       </main>
 
-      <StatusBar doc={doc} dirty={dirty} autosave={autosave} {...cursor} words={words} />
+      <StatusBar doc={doc} dirty={dirty} autosave={autosave} {...cursor} words={words} zoom={zoom} />
     </div>
   );
 }

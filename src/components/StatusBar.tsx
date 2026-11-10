@@ -9,9 +9,11 @@ interface StatusBarProps {
   /** Characters selected, 0 for a plain cursor. */
   selected: number;
   words: number;
+  /** Text size multiplier; shown when it is not 100%. */
+  zoom: number;
 }
 
-export function StatusBar({ doc, dirty, autosave, line, col, selected, words }: StatusBarProps) {
+export function StatusBar({ doc, dirty, autosave, line, col, selected, words, zoom }: StatusBarProps) {
   const state = dirty ? "Unsaved" : doc.path ? "Saved" : "New file";
   return (
     <footer className="statusbar">
@@ -26,6 +28,7 @@ export function StatusBar({ doc, dirty, autosave, line, col, selected, words }: 
       <span>
         {words.toLocaleString()} {words === 1 ? "word" : "words"}
       </span>
+      {zoom !== 1 && <span title="View › Actual Size resets it">{Math.round(zoom * 100)}%</span>}
       <span className={`save-state${dirty ? " unsaved" : doc.path ? "" : " fresh"}`}>{state}</span>
       <span title="Settings › Autosave">{autosave ? "Autosave on" : "Autosave off"}</span>
     </footer>

@@ -171,7 +171,6 @@ fn safe_file_name(name: &str) -> String {
 #[tauri::command]
 pub async fn save_image(dir: String, name: String, data: String) -> Result<String, String> {
     use base64::Engine;
-    use std::io::Write;
 
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(data.as_bytes())
@@ -179,10 +178,31 @@ pub async fn save_image(dir: String, name: String, data: String) -> Result<Strin
     if bytes.len() > MAX_IMAGE_BYTES {
         return Err("That image is too large to paste (the limit is 25 MB).".into());
     }
-    let folder = Path::new(&dir);
+    write_unique(&dir, &name, &bytes)
+}
+
+/// Copies an image file dropped onto the editor into `dir`, like a pasted one. Returns the file name used.
+#[tauri::command]
+pub async fn import_image(dir: String, source: String) -> Result<String, String> {
+    let src = Path::new(&source);
+    let size = std::fs::metadata(src).map_err(|e| format!("Could not read {source}: {e}"))?.len();
+    if size > MAX_IMAGE_BYTES as u64 {
+        return Err("That image is too large to add (the limit is 25 MB).".into());
+    }
+    let bytes = std::fs::read(src).map_err(|e| format!("Could not read {source}: {e}"))?;
+    let name = src.file_name().and_then(|n| n.to_str()).unwrap_or("image");
+    write_unique(&dir, name, &bytes)
+}
+
+/// Writes `bytes` into `dir` (created if needed) under a safe form of `name`,
+/// never overwriting: a taken name gets `-1`, `-2`, … before the extension.
+fn write_unique(dir: &str, name: &str, bytes: &[u8]) -> Result<String, String> {
+    use std::io::Write;
+
+    let folder = Path::new(dir);
     std::fs::create_dir_all(folder).map_err(|e| format!("Could not create {dir}: {e}"))?;
 
-    let name = safe_file_name(&name);
+    let name = safe_file_name(name);
     let as_path = Path::new(&name);
     let stem = as_path.file_stem().and_then(|s| s.to_str()).unwrap_or("image").to_string();
     let ext = as_path.extension().and_then(|e| e.to_str()).map(|e| format!(".{e}")).unwrap_or_default();
@@ -192,7 +212,7 @@ pub async fn save_image(dir: String, name: String, data: String) -> Result<Strin
         match std::fs::OpenOptions::new().write(true).create_new(true).open(folder.join(&candidate)) {
             Ok(mut file) => {
                 return file
-                    .write_all(&bytes)
+                    .write_all(bytes)
                     .map(|_| candidate)
                     .map_err(|e| format!("Could not save the image: {e}"));
             }
@@ -201,6 +221,88 @@ pub async fn save_image(dir: String, name: String, data: String) -> Result<Strin
         }
     }
     Err("Could not find a free file name for the image.".into())
+}
+
+/// What a dropped path is: "dir", "file" or "none".
+#[tauri::command]
+pub fn path_kind(path: String) -> &'static str {
+    match std::fs::metadata(&path) {
+        Ok(m) if m.is_dir() => "dir",
+        Ok(m) if m.is_file() => "file",
+        _ => "none",
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchHit {
+    path: String,
+    /// 0-based line and column (in UTF-16 units, as the editor counts) of the match.
+    line: usize,
+    column: usize,
+    /// The matching line, trimmed and shortened around the match.
+    text: String,
+    /// Where the match sits in `text`, in UTF-16 units.
+    start: usize,
+    length: usize,
+}
+
+const MAX_HITS: usize = 500;
+const MAX_SEARCHED_BYTES: u64 = 5 * 1024 * 1024;
+const SNIPPET_BEFORE: usize = 30;
+const SNIPPET_AFTER: usize = 90;
+
+/// Every line containing `query` (ignoring case) in the Markdown files under `root`, in tree order.
+#[tauri::command]
+pub async fn search_folder(root: String, query: String) -> Result<Vec<SearchHit>, String> {
+    let needle: Vec<char> = query.to_lowercase().chars().collect();
+    let mut hits = Vec::new();
+    if needle.is_empty() {
+        return Ok(hits);
+    }
+    let tree = list_folder(root).await?;
+    search_nodes(&tree, &needle, &mut hits);
+    Ok(hits)
+}
+
+fn search_nodes(nodes: &[TreeNode], needle: &[char], hits: &mut Vec<SearchHit>) {
+    for node in nodes {
+        if hits.len() >= MAX_HITS {
+            return;
+        }
+        if let Some(children) = &node.children {
+            search_nodes(children, needle, hits);
+        } else if std::fs::metadata(&node.path).is_ok_and(|m| m.len() <= MAX_SEARCHED_BYTES) {
+            if let Ok(bytes) = std::fs::read(&node.path) {
+                search_text(&node.path, &String::from_utf8_lossy(&bytes), needle, hits);
+            }
+        }
+    }
+}
+
+fn search_text(path: &str, text: &str, needle: &[char], hits: &mut Vec<SearchHit>) {
+    let utf16 = |chars: &[char]| chars.iter().map(|c| c.len_utf16()).sum::<usize>();
+    for (line, raw) in text.trim_start_matches('\u{feff}').lines().enumerate() {
+        if hits.len() >= MAX_HITS {
+            return;
+        }
+        let chars: Vec<char> = raw.chars().collect();
+        // Compare character by character so positions stay valid when lowercasing changes a length.
+        let lower: Vec<char> = chars.iter().map(|c| c.to_lowercase().next().unwrap_or(*c)).collect();
+        let Some(at) = lower.windows(needle.len()).position(|w| w == needle) else { continue };
+        let from = at.saturating_sub(SNIPPET_BEFORE);
+        let to = (at + needle.len() + SNIPPET_AFTER).min(chars.len());
+        let lead = if from > 0 { "…" } else { "" };
+        let snippet: String = chars[from..to].iter().collect();
+        hits.push(SearchHit {
+            path: path.to_owned(),
+            line,
+            column: utf16(&chars[..at]),
+            text: format!("{lead}{snippet}{}", if to < chars.len() { "…" } else { "" }),
+            start: utf16(&chars[from..at]) + lead.encode_utf16().count(),
+            length: utf16(&chars[at..at + needle.len()]),
+        });
+    }
 }
 
 #[cfg(test)]
@@ -222,6 +324,17 @@ mod tests {
         assert_eq!(std::fs::read(dir.join("shot-1.png")).unwrap(), b"png-bytes");
         assert!(tauri::async_runtime::block_on(save_image(dir_s.clone(), "x.png".into(), "not base64!".into())).is_err());
         std::fs::remove_dir_all(dir.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn search_finds_lines_ignoring_case() {
+        let mut hits = Vec::new();
+        let needle: Vec<char> = "wörld".chars().collect();
+        search_text("a.md", "\u{feff}# Title\nHello WÖRLD and more\nnothing here\n", &needle, &mut hits);
+        assert_eq!(hits.len(), 1);
+        assert_eq!((hits[0].line, hits[0].column, hits[0].length), (1, 6, 5));
+        assert_eq!(&hits[0].text[..], "Hello WÖRLD and more");
+        assert_eq!(hits[0].start, 6);
     }
 
     fn temp_path(name: &str) -> String {

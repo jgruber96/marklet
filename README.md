@@ -11,6 +11,9 @@ A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Taur
 - **Live preview** beside the editor, updated as you type, with scroll kept in sync both ways
 - **Rich view**: edit with the Markdown symbols hidden (headings, bold, links, bullets, task boxes, images, tables, math and diagrams shown as they will read); the source comes back where the cursor is, Ctrl+click follows a link, and the file stays plain Markdown
 - **Folder workspace**: a tree of every Markdown file with new, rename and delete, which follows changes made outside the app
+- **Search in folder**: a search box above the file tree lists every matching line in the folder's notes; click one to jump to it
+- **Drag and drop**: drop a note to open it, a folder to browse it, or an image onto the editor to add it
+- **Open Recent** in the File menu, and **zoom** for the editor and preview text
 - **Tabs** with an unsaved dot, a save prompt on close, and session restore on the next launch
 - **Outline** of the current file's headings; click one to jump both panes there
 - **Syntax highlighting** for Markdown and for code in 12 languages, with the same colors in the editor and the preview
@@ -99,6 +102,8 @@ Ctrl on Windows, Cmd on macOS.
 | Close tab / next tab / previous tab | Ctrl+W / Ctrl+Tab / Ctrl+Shift+Tab |
 | Export as HTML / PDF | Ctrl+Shift+E / Ctrl+P |
 | Editor only / Split / Preview only / Rich | Ctrl+1 / Ctrl+2 / Ctrl+3 / Ctrl+4 |
+| Find in folder | Ctrl+Shift+F |
+| Zoom in / out / actual size | Ctrl+= / Ctrl+- / Ctrl+0 |
 | Find and replace | Ctrl+F (Enter / Shift+Enter for next / previous, Esc to close) |
 | Bold / Italic / Link | Ctrl+B / Ctrl+I / Ctrl+K |
 | Follow a link in Rich view | Ctrl+click |
@@ -129,6 +134,7 @@ Not yet run on a Mac. On macOS 13+ (Apple Silicon), check:
 - [x] 8. Image paste: pasted images saved beside the document in `assets/` and linked with a relative path
 - [x] 9. Spell check: the web view's checker on prose only, with a Settings toggle
 - [x] 10. Auto-update: signed updates from GitHub Releases, checked at startup and from the Settings menu
+- [x] 16. Everyday basics: Open Recent, drag and drop (notes, folders, images), text zoom, and search across the open folder
 - [x] 15. Automated checks and releases: GitHub Actions run the tests on every push and build, sign and publish a release from a version tag
 - [x] 14. Crash recovery: unsaved work is kept in a recovery copy and offered back after an unclean exit
 - [x] 13. Aurora redesign: indigo surfaces, a three-color glow, pop colors for Markdown structure and icons, rounded tabs and an icon toolbar
