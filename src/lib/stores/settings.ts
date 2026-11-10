@@ -178,3 +178,70 @@ export async function saveRecent(files: string[]): Promise<void> {
   await invoke("set_recent_menu", { files });
   await (await settingsStore()).set("recent", files);
 }
+
+export const ACCENT_LABELS: Record<AccentSetting, string> = {
+  blue: "Aurora",
+  purple: "Purple",
+  green: "Green",
+  orange: "Orange",
+  pink: "Pink",
+  teal: "Teal",
+};
+
+/*
+ * Fonts and line width (Settings › Text). Each choice is a CSS value set on
+ * <html>, over the defaults in theme.css. Only the bundled fonts are certain
+ * to exist; the others name fonts that ship with Windows or macOS and fall
+ * back along their stack.
+ */
+export const EDITOR_FONTS = [
+  { id: "jetbrains", label: "JetBrains Mono", css: '"JetBrains Mono", ui-monospace, "Cascadia Mono", Menlo, monospace' },
+  { id: "cascadia", label: "Cascadia Mono", css: '"Cascadia Mono", "Cascadia Code", Consolas, Menlo, monospace' },
+  { id: "consolas", label: "Consolas", css: 'Consolas, Menlo, "Courier New", monospace' },
+  { id: "system", label: "System monospace", css: "ui-monospace, Menlo, Consolas, monospace" },
+] as const;
+
+export const TEXT_FONTS = [
+  { id: "inter", label: "Inter", css: '"Inter", system-ui, -apple-system, "Segoe UI", sans-serif' },
+  { id: "system", label: "System", css: 'system-ui, -apple-system, "Segoe UI", sans-serif' },
+  { id: "serif", label: "Serif (Georgia)", css: 'Georgia, "Iowan Old Style", "Times New Roman", serif' },
+] as const;
+
+export const TEXT_WIDTHS = [
+  { id: "narrow", label: "Narrow", css: "680px" },
+  { id: "medium", label: "Medium", css: "820px" },
+  { id: "wide", label: "Wide", css: "1040px" },
+  { id: "full", label: "Full width", css: "none" },
+] as const;
+
+export interface Look {
+  editorFont: (typeof EDITOR_FONTS)[number]["id"];
+  textFont: (typeof TEXT_FONTS)[number]["id"];
+  textWidth: (typeof TEXT_WIDTHS)[number]["id"];
+}
+
+export const DEFAULT_LOOK: Look = { editorFont: "jetbrains", textFont: "inter", textWidth: "medium" };
+
+const cssOf = <T extends { id: string; css: string }>(list: readonly T[], id: string) => (list.find((o) => o.id === id) ?? list[0]).css;
+
+export function applyLook(look: Look): void {
+  const style = document.documentElement.style;
+  style.setProperty("--font-mono", cssOf(EDITOR_FONTS, look.editorFont));
+  style.setProperty("--font-text", cssOf(TEXT_FONTS, look.textFont));
+  style.setProperty("--text-width", cssOf(TEXT_WIDTHS, look.textWidth));
+}
+
+export async function loadLook(): Promise<Look> {
+  if (!isTauri()) return DEFAULT_LOOK;
+  const v = ((await (await settingsStore()).get("look")) ?? {}) as Partial<Record<keyof Look, unknown>>;
+  const pick = <T extends { id: string }>(list: readonly T[], id: unknown, fallback: T["id"]) => (list.some((o) => o.id === id) ? (id as T["id"]) : fallback);
+  return {
+    editorFont: pick(EDITOR_FONTS, v.editorFont, DEFAULT_LOOK.editorFont),
+    textFont: pick(TEXT_FONTS, v.textFont, DEFAULT_LOOK.textFont),
+    textWidth: pick(TEXT_WIDTHS, v.textWidth, DEFAULT_LOOK.textWidth),
+  };
+}
+
+export async function saveLook(look: Look): Promise<void> {
+  if (isTauri()) await (await settingsStore()).set("look", look);
+}

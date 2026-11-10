@@ -39,6 +39,11 @@ import {
   saveSpellCheck,
   loadTheme,
   isViewMode,
+  DEFAULT_LOOK,
+  type Look,
+  applyLook,
+  loadLook,
+  saveLook,
   RECENT_LIMIT,
   ZOOM_STEPS,
   applyZoom,
@@ -79,6 +84,7 @@ import { Toolbar } from "./components/Toolbar";
 import { TabStrip } from "./components/TabStrip";
 import { StatusBar } from "./components/StatusBar";
 import { Splitter } from "./components/Splitter";
+import { SettingsDialog } from "./components/SettingsDialog";
 
 const SIDEBAR_MIN = 180;
 const SIDEBAR_MAX = 420;
@@ -129,6 +135,8 @@ export default function App() {
   const [source, setSource] = useState("");
   const [zoom, setZoomState] = useState(1);
   const [searchFocus, setSearchFocus] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [look, setLookState] = useState<Look>(DEFAULT_LOOK);
   /** File › Open Recent, most recent first. */
   const recent = useRef<string[]>([]);
 
@@ -685,6 +693,24 @@ export default function App() {
     });
   };
 
+  /** Settings › Text size. */
+  const setZoom = (value: number) => {
+    setZoomState(value);
+    applyZoom(value);
+    void saveZoom(value);
+    editor.current?.view?.requestMeasure();
+  };
+
+  /** Settings › fonts and line width. */
+  const setLook = (value: Look) => {
+    setLookState(value);
+    applyLook(value);
+    void saveLook(value);
+    // Fonts arrive a moment after they are named; measure again once they are in.
+    editor.current?.view?.requestMeasure();
+    void document.fonts.ready.then(() => editor.current?.view?.requestMeasure());
+  };
+
   // ---- Export ----
 
   const exportAs = async (kind: ExportKind) => {
@@ -810,6 +836,10 @@ export default function App() {
         e.preventDefault();
         return actions.current.stepZoom(zoomStep);
       }
+      if (key === "," && !e.shiftKey) {
+        e.preventDefault();
+        return setSettingsOpen((open) => !open);
+      }
       if (key === "f" && e.shiftKey) {
         e.preventDefault();
         return actions.current.findInFolder();
@@ -839,6 +869,7 @@ export default function App() {
       else if (group === "recent") void exclusive(() => actions.current.openRecent(Number(value)));
       else if (id === "zoom-in" || id === "zoom-out" || id === "zoom-reset") actions.current.stepZoom(id === "zoom-in" ? 1 : id === "zoom-out" ? -1 : 0);
       else if (id === "find-in-folder") actions.current.findInFolder();
+      else if (id === "settings") setSettingsOpen(true);
       else if (id === "autosave") void actions.current.setAutosave(!autosaveOn.current);
       else if (id === "spellcheck") void actions.current.setSpellCheckSetting(!spellCheckOn.current);
       else run(id);
@@ -876,6 +907,11 @@ export default function App() {
     void loadViewMode().then((mode) => {
       setViewModeState(mode);
       void checkMenuGroup("view", mode);
+    });
+    void loadLook().then((value) => {
+      setLookState(value);
+      applyLook(value);
+      void document.fonts.ready.then(() => editor.current?.view?.requestMeasure());
     });
     void loadZoom().then((value) => {
       applyZoom(value);
@@ -1049,6 +1085,36 @@ export default function App() {
           />
         </div>
       </main>
+
+      {settingsOpen && (
+        <SettingsDialog
+          values={{ theme: theme.current, accent: accent.current, look, zoom, autosave, spellCheck: spellCheckOn.current }}
+          onTheme={(value) => {
+            void setTheme(value);
+            void syncThemeMenu(value);
+            render();
+          }}
+          onAccent={(value) => {
+            void setAccent(value);
+            render();
+          }}
+          onLook={setLook}
+          onZoom={setZoom}
+          onAutosave={(on) => void setAutosave(on)}
+          onSpellCheck={(on) => {
+            void setSpellCheckSetting(on);
+            render();
+          }}
+          onCheckUpdates={() => {
+            setSettingsOpen(false);
+            run("check-updates");
+          }}
+          onClose={() => {
+            setSettingsOpen(false);
+            editor.current?.focus();
+          }}
+        />
+      )}
 
       <StatusBar doc={doc} dirty={dirty} autosave={autosave} {...cursor} words={words} zoom={zoom} />
     </div>

@@ -105,6 +105,8 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     checks.push(("spellcheck".into(), spellcheck.clone()));
     app.manage(CheckItems(checks));
     let settings = SubmenuBuilder::new(app, "Settings")
+        .item(&item("settings", "Settings…", Some("CmdOrCtrl+,"))?)
+        .separator()
         .item(&theme)
         .item(&accent)
         .separator()

@@ -2,11 +2,11 @@
 
 .markdown-body {
   box-sizing: border-box;
-  max-width: 820px;
+  max-width: var(--text-width, 820px);
   margin: 0 auto;
   padding: 24px 32px 40vh;
   color: var(--text);
-  font: 15px/1.65 var(--font-ui);
+  font: 15px/1.65 var(--font-text, var(--font-ui));
   font-size: calc(15px * var(--zoom, 1));
   user-select: text;
   overflow-wrap: break-word;

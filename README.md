@@ -26,6 +26,7 @@ A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Taur
 - **Crash recovery**: unsaved work, including notes never saved, is offered back if the app or PC goes down
 - **Formatting** buttons and shortcuts, plus autosave after 2 seconds idle
 - **Export** to a standalone HTML file or to PDF
+- **Settings window** (Ctrl+,): theme, accent, editor and reading fonts, text size, line width, autosave and spell check
 - **Light and dark** themes that follow the OS, with an override and six accent presets (Aurora by default), each with its own glow
 
 ## Screenshots
@@ -102,6 +103,7 @@ Ctrl on Windows, Cmd on macOS.
 | Close tab / next tab / previous tab | Ctrl+W / Ctrl+Tab / Ctrl+Shift+Tab |
 | Export as HTML / PDF | Ctrl+Shift+E / Ctrl+P |
 | Editor only / Split / Preview only / Rich | Ctrl+1 / Ctrl+2 / Ctrl+3 / Ctrl+4 |
+| Settings | Ctrl+, |
 | Find in folder | Ctrl+Shift+F |
 | Zoom in / out / actual size | Ctrl+= / Ctrl+- / Ctrl+0 |
 | Find and replace | Ctrl+F (Enter / Shift+Enter for next / previous, Esc to close) |
@@ -134,6 +136,7 @@ Not yet run on a Mac. On macOS 13+ (Apple Silicon), check:
 - [x] 8. Image paste: pasted images saved beside the document in `assets/` and linked with a relative path
 - [x] 9. Spell check: the web view's checker on prose only, with a Settings toggle
 - [x] 10. Auto-update: signed updates from GitHub Releases, checked at startup and from the Settings menu
+- [x] 17. Settings window: one dialog for appearance, fonts, text size, line width and editing options (the Settings menu keeps its quick toggles)
 - [x] 16. Everyday basics: Open Recent, drag and drop (notes, folders, images), text zoom, and search across the open folder
 - [x] 15. Automated checks and releases: GitHub Actions run the tests on every push and build, sign and publish a release from a version tag
 - [x] 14. Crash recovery: unsaved work is kept in a recovery copy and offered back after an unclean exit
