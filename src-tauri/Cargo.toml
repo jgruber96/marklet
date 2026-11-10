@@ -1,6 +1,6 @@
 [package]
 name = "marklet"
-version = "0.1.0"
+version = "0.2.0"
 description = "Marklet — a Markdown editor"
 authors = ["DarkstarDEV"]
 license = "MIT"
@@ -22,6 +22,8 @@ trash = "5.2.9"
 tauri-plugin-window-state = "2.5.0"
 base64 = "0.22"
 tauri-plugin-single-instance = "2.5.5"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 
 [target.'cfg(windows)'.dependencies]
 # Same versions Tauri's wry uses, for WebView2's PrintToPdf.

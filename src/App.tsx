@@ -9,6 +9,7 @@ import { Editor, type EditorHandle } from "./lib/editor/Editor";
 import { type FormatKind, formatCommands } from "./lib/editor/format";
 import { saveImages } from "./lib/editor/images";
 import { setSpellCheck } from "./lib/editor/spellcheck";
+import { checkForUpdate } from "./lib/update";
 import { Sidebar } from "./lib/sidebar/Sidebar";
 import {
   type Doc,
@@ -532,6 +533,16 @@ export default function App() {
     "prev-tab": async () => cycleTab(-1),
     "export-html": () => exportAs("html"),
     "export-pdf": () => exportAs("pdf"),
+    "check-updates": () => checkForUpdate(true, readyToRestart),
+  };
+
+  /** Before an update restarts the app: every unsaved tab is saved or discarded, as on quit. */
+  const readyToRestart = async () => {
+    for (const tab of [...tabs.current]) {
+      if (!(await confirmDiscard(tab))) return false;
+    }
+    await flushSettings();
+    return true;
   };
 
   // Latest handlers for listeners registered once.
@@ -539,8 +550,9 @@ export default function App() {
     for (const path of paths) await openPath(path);
   };
 
-  const actions = useRef({ commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, setSpellCheckSetting, confirmDiscard, openFiles });
-  actions.current = { commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, setSpellCheckSetting, confirmDiscard, openFiles };
+  const handlers = { commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, setSpellCheckSetting, confirmDiscard, openFiles, readyToRestart };
+  const actions = useRef(handlers);
+  actions.current = handlers;
 
   // Serialize file actions so a second trigger can't open a second dialog. A
   // shortcut can arrive both as a keydown and as a menu accelerator, so the
@@ -664,6 +676,10 @@ export default function App() {
       // A file the app was launched to open (double-click) comes to the front.
       if (isTauri()) await openFiles(await invoke<string[]>("take_launch_files"));
     });
+    // Look for a new version once the window has settled (installed builds only).
+    if (!import.meta.env.DEV) {
+      window.setTimeout(() => void exclusive(() => checkForUpdate(false, () => actions.current.readyToRestart()), true), 3000);
+    }
   }, []);
 
   useEffect(() => {

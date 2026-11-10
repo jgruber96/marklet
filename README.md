@@ -17,6 +17,7 @@ A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Taur
 - **Diagrams**: a `mermaid` code block renders as a diagram, redrawn as you type
 - **Image paste**: paste a screenshot or a copied image into the editor; it is saved in an `assets` folder next to the file and linked
 - **Spell check** in the editor with the system dictionaries, skipping code, links and HTML; turn it off in Settings
+- **Auto-update**: checks for a new version at startup and installs it when you agree
 - **Formatting** buttons and shortcuts, plus autosave after 2 seconds idle
 - **Export** to a standalone HTML file or to PDF
 - **Light and dark** themes that follow the OS, with an override and six accent colors
@@ -54,6 +55,24 @@ npm run tauri build -- --target aarch64-apple-darwin
 ```
 
 Builds are unsigned, so Windows SmartScreen and macOS Gatekeeper warn on first launch. Both register `.md` and `.markdown` files to open in Marklet.
+
+## Releasing an update
+
+Installed copies check the newest GitHub release at startup (and from Settings › Check for Updates) and offer to install it. An update is only accepted if it was signed with the project's private update key, so a build needs that key:
+
+1. Set the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`.
+2. Build with the key (PowerShell; the key file is kept outside the repo):
+
+   ```powershell
+   $env:TAURI_SIGNING_PRIVATE_KEY = "$HOME\.tauri\marklet.key"
+   $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
+   npm run tauri build
+   ```
+
+3. Write `installers/latest.json`: `node scripts/latest-json.mjs "What changed"`.
+4. Create the GitHub release tagged `v<version>` and attach `Marklet_<version>_x64-setup.exe`, the `.msi`, and `latest.json`.
+
+Back up the key file. If it is lost, installed copies can no longer be updated automatically and need a manual reinstall with a new key. Version 0.1.0 has no updater; it is replaced by installing 0.2.0 by hand. Auto-update is Windows-only until a macOS build is added to `latest.json`.
 
 ## Keyboard shortcuts
 
@@ -93,6 +112,7 @@ Not yet run on a Mac. On macOS 13+ (Apple Silicon), check:
 - [x] 7. Math and diagrams: KaTeX and Mermaid in the preview and in HTML and PDF export, loaded on first use
 - [x] 8. Image paste: pasted images saved beside the document in `assets/` and linked with a relative path
 - [x] 9. Spell check: the web view's checker on prose only, with a Settings toggle
+- [x] 10. Auto-update: signed updates from GitHub Releases, checked at startup and from the Settings menu
 
 ## License
 
