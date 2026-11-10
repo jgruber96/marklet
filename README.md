@@ -9,6 +9,7 @@ A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Taur
 ## Features
 
 - **Live preview** beside the editor, updated as you type, with scroll kept in sync both ways
+- **Rich view**: edit with the Markdown symbols hidden (headings, bold, links, bullets, task boxes and images shown as they will read); the symbols come back where the cursor is, and the file stays plain Markdown
 - **Folder workspace**: a tree of every Markdown file with new, rename and delete, which follows changes made outside the app
 - **Tabs** with an unsaved dot, a save prompt on close, and session restore on the next launch
 - **Outline** of the current file's headings; click one to jump both panes there
@@ -84,7 +85,7 @@ Ctrl on Windows, Cmd on macOS.
 | Save / Save As | Ctrl+S / Ctrl+Shift+S |
 | Close tab / next tab / previous tab | Ctrl+W / Ctrl+Tab / Ctrl+Shift+Tab |
 | Export as HTML / PDF | Ctrl+Shift+E / Ctrl+P |
-| Editor only / Split / Preview only | Ctrl+1 / Ctrl+2 / Ctrl+3 |
+| Editor only / Split / Preview only / Rich | Ctrl+1 / Ctrl+2 / Ctrl+3 / Ctrl+4 |
 | Bold / Italic / Link | Ctrl+B / Ctrl+I / Ctrl+K |
 | Move focus out of the editor | Esc, then Tab |
 | Back to the editor from the sidebar | Esc |
@@ -113,6 +114,7 @@ Not yet run on a Mac. On macOS 13+ (Apple Silicon), check:
 - [x] 8. Image paste: pasted images saved beside the document in `assets/` and linked with a relative path
 - [x] 9. Spell check: the web view's checker on prose only, with a Settings toggle
 - [x] 10. Auto-update: signed updates from GitHub Releases, checked at startup and from the Settings menu
+- [x] 11. Rich view: a fourth view mode that hides Markdown symbols away from the cursor and draws images, bullets and task boxes in place; tables, math, diagrams and HTML stay as source there
 
 ## License
 
