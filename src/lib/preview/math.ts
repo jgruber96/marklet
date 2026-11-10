@@ -96,7 +96,8 @@ const isDigit = (code: number) => code >= 0x30 && code <= 0x39;
 /**
  * `$…$`. To leave prices alone ("$5 and $10"), the opening `$` must not be
  * followed by a space and the closing `$` must not follow a space or precede
- * a digit.
+ * a digit. A backtick in between means the `$` belongs to (or sits beside)
+ * inline code, not to a formula.
  */
 function mathInline(state: StateInline, silent: boolean): boolean {
   const { src, posMax } = state;
@@ -122,6 +123,7 @@ function mathInline(state: StateInline, silent: boolean): boolean {
     end++;
   }
   if (isSpace(src.charCodeAt(end - 1)) || (end + 1 < posMax && isDigit(src.charCodeAt(end + 1)))) return literal("$");
+  if (src.slice(start + 1, end).includes("`")) return literal("$");
 
   if (!silent) {
     const token = state.push("math_inline", "math", 0);

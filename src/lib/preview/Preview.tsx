@@ -1,11 +1,10 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, type MouseEvent } from "react";
 import { isTauri } from "@tauri-apps/api/core";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { renderMarkdown } from "./render";
 import { onHighlighterChange } from "./highlight";
 import { onEmbedsChange } from "./embeds";
-import { isAbsolutePath, isMarkdownPath, joinPath } from "../paths";
+import { followLink } from "../links";
 
 /** Longest a keystroke waits before the preview re-renders (brief: within 150 ms). */
 const RENDER_INTERVAL_MS = 40;
@@ -92,24 +91,10 @@ export const Preview = forwardRef<PreviewHandle, PreviewProps>(function Preview(
       }
       const target = id && content.current?.querySelector(`[id="${CSS.escape(id)}"]`);
       if (target) target.scrollIntoView({ block: "start" });
-    } else if (/^(https?|mailto):/i.test(href)) {
-      if (isTauri()) void openUrl(href);
-      else window.open(href, "_blank", "noopener");
-    } else if (!/^[a-z][a-z0-9+.-]*:/i.test(href) || isAbsolutePath(href)) {
-      // A link to another note opens it in a tab; the #fragment is ignored for now.
-      let path = href.split("#")[0];
-      try {
-        path = decodeURI(path);
-      } catch {
-        // Use as-is.
-      }
+    } else {
+      // Web links open in the browser; a link to another note opens it in a tab.
       const { baseDir, onOpenFile } = latest.current;
-      if (!isMarkdownPath(path)) return;
-      if (!isAbsolutePath(path)) {
-        if (!baseDir) return;
-        path = joinPath(baseDir, path);
-      }
-      onOpenFile(path);
+      followLink(href, baseDir, onOpenFile);
     }
   };
 

@@ -16,6 +16,8 @@ interface RenderEnv {
   slots: string[];
   slotKey: string;
   diagrams: number;
+  /** A piece of a document drawn inside the editor (Rich view), not a whole preview pass. */
+  fragment: boolean;
   [key: string | symbol]: unknown;
 }
 
@@ -62,7 +64,7 @@ md.renderer.rules.fence = (tokens, idx, _options, rawEnv) => {
   const tag = fenceTag(token.info);
   const env = rawEnv as RenderEnv;
   if (tag === "mermaid") {
-    return `<div class="mermaid-block"${lineAttr(token)}>${slot(env, "div", diagramHtml(token.content, env.diagrams++))}</div>\n`;
+    return `<div class="mermaid-block"${lineAttr(token)}>${slot(env, "div", diagramHtml(token.content, env.fragment ? -1 : env.diagrams++))}</div>\n`;
   }
   const lang = languageForTag(tag);
   const body = highlightCode(token.content, tag) ?? escapeHtml(token.content.replace(/\n$/, ""));
@@ -113,7 +115,16 @@ const ALLOWED_URI_REGEXP = /^(?:(?:https?|mailto|tel|asset|data):|[^a-z]|[a-z+.-
  */
 export function renderMarkdown(source: string, baseDir: string | null, docKey: unknown = null): string {
   beginDiagramPass(docKey);
-  const env: RenderEnv = { baseDir, slots: [], slotKey: crypto.randomUUID(), diagrams: 0 };
+  return render(source, baseDir, false);
+}
+
+/** One block of a document (a table, a diagram, a formula) for the Rich view; leaves the preview's diagram pass alone. */
+export function renderFragment(source: string, baseDir: string | null): string {
+  return render(source, baseDir, true);
+}
+
+function render(source: string, baseDir: string | null, fragment: boolean): string {
+  const env: RenderEnv = { baseDir, slots: [], slotKey: crypto.randomUUID(), diagrams: 0, fragment };
   const html = DOMPurify.sanitize(md.render(source, env), {
     ALLOWED_URI_REGEXP,
     FORBID_TAGS: ["style", "form"],

@@ -102,7 +102,8 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(prop
       const v = view.current;
       if (!v) return;
       v.setState(state);
-      if (scroll) v.dispatch({ effects: scroll });
+      // Always one update: background tabs pick up settings changed since they were last shown.
+      v.dispatch(scroll ? { effects: scroll } : {});
       v.focus();
       reportCursor(state);
     },

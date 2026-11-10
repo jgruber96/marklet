@@ -117,7 +117,10 @@ export default function App() {
 
   const activeTab = (): Tab | undefined => tabs.current.find((t) => t.id === activeId.current);
   // The Rich view shows images in place and needs the open file's folder (reads refs, so it stays current).
-  configureRich({ baseDir: () => dirOf(activeTab()?.doc.path ?? null) });
+  configureRich({
+    baseDir: () => dirOf(activeTab()?.doc.path ?? null),
+    openFile: (path) => void exclusive(() => actions.current.openFiles([path])),
+  });
   const findTab = (path: string) => tabs.current.find((t) => t.doc.path && samePath(t.doc.path, path));
 
   const textOf = (tab: Tab): string => {

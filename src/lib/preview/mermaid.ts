@@ -104,7 +104,8 @@ const figure = (d: Drawing) =>
   `<div class="mermaid-diagram" data-scheme="light">${d.light}</div><div class="mermaid-diagram" data-scheme="dark">${d.dark}</div>`;
 
 /**
- * HTML for the `index`-th diagram of the document. Contains Mermaid's own
+ * HTML for the `index`-th diagram of the document (-1: a diagram drawn on
+ * its own, with no previous drawing to fall back on). Contains Mermaid's own
  * (sanitized) SVG with its inline styles, so the caller must insert it after
  * sanitizing the surrounding Markdown.
  */
@@ -115,12 +116,12 @@ export function diagramHtml(source: string, index: number): string {
 
   const hit = results.get(code);
   if (hit && "ok" in hit) {
-    if (keepPrevious) lastGood[index] = hit.ok;
+    if (keepPrevious && index >= 0) lastGood[index] = hit.ok;
     return figure(hit.ok);
   }
   if (!hit) request(code);
 
-  const previous = keepPrevious ? lastGood[index] : undefined;
+  const previous = keepPrevious && index >= 0 ? lastGood[index] : undefined;
   const error = hit ? `<div class="mermaid-error">${escapeHtml(hit.error)}</div>` : "";
   if (previous) return `<div class="mermaid-stale">${figure(previous)}</div>${error}`;
   if (hit) return `${error}<pre><code>${escapeHtml(code)}</code></pre>`;

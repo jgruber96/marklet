@@ -1,24 +1,107 @@
 import { syntaxTree } from "@codemirror/language";
-import type { Range } from "@codemirror/state";
-import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
-import { resolveLocalSrc } from "../preview/render";
+import { StateField, type EditorState, type Range } from "@codemirror/state";
+import { Decoration, EditorView, ViewPlugin, WidgetType, keymap, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import { renderFragment, resolveLocalSrc } from "../preview/render";
+import { mathHtml } from "../preview/math";
+import { onEmbedsChange } from "../preview/embeds";
+import { fenceTag } from "../languages";
+import { followLink } from "../links";
 
 /*
  * Rich view: the same editor and the same plain Markdown text, drawn the way
  * it will read. Markdown symbols (#, **, backticks, link addresses, >) are
  * hidden until the cursor or selection reaches them, images are shown in
  * place, bullets and task boxes are drawn, and prose uses the preview's font.
+ * Tables, diagrams and formulas are drawn as in the preview and turn back
+ * into source when clicked. Ctrl/Cmd+click follows a link.
  * Nothing here changes the document except ticking a task box.
  *
- * Tables, math, diagrams and raw HTML stay as source in this view.
+ * Raw HTML, and tables, diagrams and display formulas nested inside a list or
+ * a quote, stay as source in this view.
  */
 
 let enabled = false;
 let baseDir: () => string | null = () => null;
+let openFile: (path: string) => void = () => {};
 
-/** Where the open document lives, for showing its relative images. */
-export function configureRich(options: { baseDir(): string | null }): void {
+/** Where the open document lives (for its relative images and links), and how to open a linked note. */
+export function configureRich(options: { baseDir(): string | null; openFile(path: string): void }): void {
   baseDir = options.baseDir;
+  openFile = options.openFile;
+}
+
+/** Widgets whose content arrives late (KaTeX and Mermaid load on first use) redraw when it is ready. */
+const redrawers = new WeakMap<HTMLElement, () => void>();
+function drawWhenReady(dom: HTMLElement, view: EditorView, html: () => string): void {
+  let shown: string | null = null;
+  const draw = () => {
+    const next = html();
+    if (next === shown) return;
+    shown = next;
+    dom.innerHTML = next;
+    view.requestMeasure();
+  };
+  draw();
+  redrawers.set(dom, onEmbedsChange(draw));
+}
+
+/** `$…$` in running text; the same shape the preview accepts, so prices like $5 and $10 are left alone. */
+const INLINE_MATH = /(?<![\\$])\$(?![\s$])((?:\\.|[^$\\\n`])+?)(?<!\s)\$(?![\d$])/g;
+/** A paragraph that is one `$$…$$` display formula. */
+const isDisplayMath = (text: string) => text.length > 4 && /^\$\$[\s\S]+\$\$\s*$/.test(text);
+
+class MathWidget extends WidgetType {
+  constructor(readonly tex: string) {
+    super();
+  }
+  eq(other: MathWidget) {
+    return other.tex === this.tex;
+  }
+  toDOM(view: EditorView) {
+    const span = document.createElement("span");
+    span.className = "cm-rich-math";
+    drawWhenReady(span, view, () => mathHtml(this.tex, false));
+    return span;
+  }
+  destroy(dom: HTMLElement) {
+    redrawers.get(dom)?.();
+  }
+  ignoreEvent() {
+    return false;
+  }
+}
+
+/** A table, diagram or display formula, drawn by the preview's renderer. */
+class BlockWidget extends WidgetType {
+  constructor(
+    readonly source: string,
+    readonly dir: string | null,
+  ) {
+    super();
+  }
+  eq(other: BlockWidget) {
+    return other.source === this.source && other.dir === this.dir;
+  }
+  toDOM(view: EditorView) {
+    const box = document.createElement("div");
+    box.className = "cm-rich-block markdown-body";
+    drawWhenReady(box, view, () => renderFragment(this.source, this.dir));
+    box.addEventListener("load", () => view.requestMeasure(), true); // images in table cells
+    box.addEventListener("click", (e) => {
+      const link = (e.target as HTMLElement).closest("a");
+      if (!link) return;
+      e.preventDefault(); // never let the web view itself navigate away from the app
+      if (e.ctrlKey || e.metaKey) followLink(link.getAttribute("href") ?? "", this.dir, openFile);
+    });
+    return box;
+  }
+  destroy(dom: HTMLElement) {
+    redrawers.get(dom)?.();
+  }
+  // A click puts the cursor on the block, which turns it back into source.
+  ignoreEvent() {
+    return false;
+  }
 }
 
 /** Turns the Rich view on or off for every tab. */
@@ -138,6 +221,12 @@ function richDecorations(view: EditorView): DecorationSet {
     const rest = doc.sliceString(pos, doc.lineAt(pos).to);
     return pos + (rest.length - rest.trimStart().length);
   };
+  const insideCode = (pos: number) => {
+    for (let n: { name: string; parent: unknown } | null = syntaxTree(state).resolveInner(pos, 1); n; n = n.parent as typeof n) {
+      if (n.name === "InlineCode" || n.name === "URL" || n.name === "Autolink" || n.name === "HTMLTag") return true;
+    }
+    return false;
+  };
   const eachLine = (from: number, to: number, deco: Decoration) => {
     for (let n = doc.lineAt(from).number, last = doc.lineAt(to).number; n <= last; n++) {
       out.push(deco.range(doc.line(n).from));
@@ -220,8 +309,19 @@ function richDecorations(view: EditorView): DecorationSet {
           case "Escape":
             if (!touched(from, to)) hide(from, from + 1);
             return;
+          case "Paragraph": {
+            const text = doc.sliceString(from, to);
+            if (isDisplayMath(text)) return false; // drawn as a block (below) when at the top level
+            for (const m of text.matchAll(INLINE_MATH)) {
+              const start = from + m.index;
+              const end = start + m[0].length;
+              if (touched(start, end) || insideCode(start)) continue;
+              out.push(Decoration.replace({ widget: new MathWidget(m[1]) }).range(start, end));
+            }
+            return;
+          }
           case "Table":
-            // Source, in the fixed-width font so the columns line up.
+            // While being edited: source, in the fixed-width font so the columns line up.
             eachLine(Math.max(from, visible.from), Math.min(to, visible.to), monoLine);
             return false;
           case "FencedCode":
@@ -235,6 +335,101 @@ function richDecorations(view: EditorView): DecorationSet {
   }
   return Decoration.set(out, true);
 }
+
+/** Top-level tables, diagrams and display formulas, replaced whole unless the selection is in them. */
+function blockDecorations(state: EditorState): DecorationSet {
+  const doc = state.doc;
+  const out: Range<Decoration>[] = [];
+  const dir = baseDir();
+  syntaxTree(state).iterate({
+    enter(ref) {
+      if (ref.name === "Document") return true;
+      let block = ref.name === "Table";
+      if (ref.name === "FencedCode") {
+        const info = ref.node.getChild("CodeInfo");
+        block = !!info && fenceTag(doc.sliceString(info.from, info.to)) === "mermaid";
+      } else if (ref.name === "Paragraph") {
+        block = isDisplayMath(doc.sliceString(ref.from, ref.to));
+      }
+      if (block) {
+        const from = doc.lineAt(ref.from).from;
+        const to = doc.lineAt(ref.to).to;
+        if (!state.selection.ranges.some((r) => r.from <= to && r.to >= from)) {
+          out.push(Decoration.replace({ widget: new BlockWidget(doc.sliceString(from, to), dir), block: true }).range(from, to));
+        }
+      }
+      return false;
+    },
+  });
+  return Decoration.set(out, true);
+}
+
+// Block replacements must come from a state field (they change the vertical layout).
+const richBlocks = StateField.define<{ on: boolean; decorations: DecorationSet }>({
+  create: (state) => ({ on: enabled, decorations: enabled ? blockDecorations(state) : Decoration.none }),
+  update(value, tr) {
+    if (!enabled) return value.on ? { on: false, decorations: Decoration.none } : value;
+    if (!value.on || tr.docChanged || tr.selection || syntaxTree(tr.startState) !== syntaxTree(tr.state)) {
+      return { on: true, decorations: blockDecorations(tr.state) };
+    }
+    return value;
+  },
+  provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
+});
+
+/**
+ * Arrow up or down onto a drawn block puts the cursor on its edge, which
+ * turns it into source; otherwise the keyboard would step over it.
+ */
+const intoBlock = (dir: 1 | -1) => (view: EditorView) => {
+  const { state } = view;
+  const cursor = state.selection.main;
+  if (!enabled || !cursor.empty) return false;
+  const line = state.doc.lineAt(cursor.head);
+  // Still moving inside a wrapped line: not leaving it yet.
+  const moved = view.moveVertically(cursor, dir > 0);
+  if (moved.head !== cursor.head && moved.head >= line.from && moved.head <= line.to) return false;
+  const next = dir > 0 ? line.to + 1 : line.from - 1;
+  if (next < 0 || next > state.doc.length) return false;
+  let edge = -1;
+  state.field(richBlocks).decorations.between(next, next, (from, to) => {
+    edge = dir > 0 ? from : to;
+    return false;
+  });
+  if (edge < 0) return false;
+  view.dispatch({ selection: { anchor: edge }, scrollIntoView: true, userEvent: "select" });
+  return true;
+};
+
+const blockKeys = keymap.of([
+  { key: "ArrowDown", run: intoBlock(1) },
+  { key: "ArrowUp", run: intoBlock(-1) },
+]);
+
+/** The address of the link at `pos`, if any. */
+function linkAt(state: EditorState, pos: number): string | null {
+  for (const side of [1, -1] as const) {
+    for (let n: ReturnType<ReturnType<typeof syntaxTree>["resolveInner"]> | null = syntaxTree(state).resolveInner(pos, side); n; n = n.parent) {
+      if (n.name === "URL") return state.doc.sliceString(n.from, n.to);
+      if (n.name === "Link" || n.name === "Autolink") {
+        const url = n.getChild("URL");
+        return url ? state.doc.sliceString(url.from, url.to) : null;
+      }
+    }
+  }
+  return null;
+}
+
+const followLinks = EditorView.domEventHandlers({
+  mousedown(event, view) {
+    if (!enabled || event.button !== 0 || !(event.ctrlKey || event.metaKey)) return false;
+    const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+    const href = pos === null ? null : linkAt(view.state, pos);
+    if (!href || !followLink(href, baseDir(), openFile)) return false;
+    event.preventDefault();
+    return true;
+  },
+});
 
 const richPlugin = ViewPlugin.fromClass(
   class {
@@ -298,6 +493,11 @@ const richTheme = EditorView.theme({
   ".cm-rich-task": { margin: "0 0.1em 0 0", verticalAlign: "-0.1em", accentColor: "var(--accent)", cursor: "pointer" },
   ".cm-rich-rule": { display: "inline-block", width: "100%", height: "2px", verticalAlign: "middle", backgroundColor: "var(--border)" },
   ".cm-rich-image": { maxWidth: "100%", verticalAlign: "bottom", borderRadius: "4px" },
+  // Overrides the preview pane's own page layout for .markdown-body.
+  // (and the editor's pre-wrap, which would turn the HTML's line breaks into gaps).
+  ".cm-rich-block": { maxWidth: "none", margin: "0", padding: "0.3em 32px", cursor: "text", whiteSpace: "normal" },
+  ".cm-rich-math": { whiteSpace: "normal" },
+  ".cm-rich-block > *": { margin: "0" },
 });
 
-export const richView = [richPlugin, richClass, richTheme];
+export const richView = [richPlugin, richBlocks, blockKeys, followLinks, richClass, richTheme];
