@@ -13,10 +13,11 @@ const ACCENTS: [(&str, &str); 6] = [
     ("pink", "Pink"),
     ("teal", "Teal"),
 ];
-const VIEWS: [(&str, &str, &str); 3] = [
+const VIEWS: [(&str, &str, &str); 4] = [
     ("editor", "Editor Only", "CmdOrCtrl+1"),
     ("split", "Split", "CmdOrCtrl+2"),
     ("preview", "Preview Only", "CmdOrCtrl+3"),
+    ("rich", "Rich", "CmdOrCtrl+4"),
 ];
 
 /// Groups whose check items behave like radio buttons: `group:value` ids.

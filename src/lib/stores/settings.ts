@@ -48,8 +48,8 @@ export async function saveTheme(theme: ThemeSetting): Promise<void> {
   await (await settingsStore()).set("theme", theme);
 }
 
-export type ViewMode = "editor" | "split" | "preview";
-const isViewMode = (v: unknown): v is ViewMode => v === "editor" || v === "split" || v === "preview";
+export type ViewMode = "editor" | "split" | "preview" | "rich";
+export const isViewMode = (v: unknown): v is ViewMode => v === "editor" || v === "split" || v === "preview" || v === "rich";
 
 // Remembered per window, keyed by window label.
 const viewModeKey = () => `viewMode.${isTauri() ? getCurrentWindow().label : "main"}`;

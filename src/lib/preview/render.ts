@@ -87,7 +87,7 @@ const hasScheme = (s: string) => /^[a-z][a-z0-9+.-]*:/i.test(s) && !isWindowsAbs
 const isWindowsAbsolute = (s: string) => /^[a-z]:[\\/]/i.test(s) || s.startsWith("\\\\");
 
 /** Maps a relative or absolute file path in an image to a URL the web view can load. */
-function resolveLocalSrc(src: string, baseDir: string | null): string {
+export function resolveLocalSrc(src: string, baseDir: string | null): string {
   if (!isTauri() || hasScheme(src) || src.startsWith("#") || src.startsWith("//")) return src;
   let path: string;
   try {

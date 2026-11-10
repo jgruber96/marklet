@@ -32,6 +32,7 @@ const viewModes: { mode: ViewMode; label: string }[] = [
   { mode: "editor", label: "Editor" },
   { mode: "split", label: "Split" },
   { mode: "preview", label: "Preview" },
+  { mode: "rich", label: "Rich" },
 ];
 
 const mod = navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl+";

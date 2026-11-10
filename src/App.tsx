@@ -9,6 +9,7 @@ import { Editor, type EditorHandle } from "./lib/editor/Editor";
 import { type FormatKind, formatCommands } from "./lib/editor/format";
 import { saveImages } from "./lib/editor/images";
 import { setSpellCheck } from "./lib/editor/spellcheck";
+import { configureRich, setRich } from "./lib/editor/rich";
 import { checkForUpdate } from "./lib/update";
 import { Sidebar } from "./lib/sidebar/Sidebar";
 import {
@@ -33,6 +34,7 @@ import {
   loadSpellCheck,
   saveSpellCheck,
   loadTheme,
+  isViewMode,
   loadViewMode,
   saveAutosave,
   saveTheme,
@@ -113,6 +115,8 @@ export default function App() {
   const [source, setSource] = useState("");
 
   const activeTab = (): Tab | undefined => tabs.current.find((t) => t.id === activeId.current);
+  // The Rich view shows images in place and needs the open file's folder (reads refs, so it stays current).
+  configureRich({ baseDir: () => dirOf(activeTab()?.doc.path ?? null) });
   const findTab = (path: string) => tabs.current.find((t) => t.doc.path && samePath(t.doc.path, path));
 
   const textOf = (tab: Tab): string => {
@@ -589,7 +593,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
       const key = e.key.toLowerCase();
-      const view = !e.shiftKey && ({ "1": "editor", "2": "split", "3": "preview" } as Record<string, ViewMode>)[e.key];
+      const view = !e.shiftKey && ({ "1": "editor", "2": "split", "3": "preview", "4": "rich" } as Record<string, ViewMode>)[e.key];
       if (view) {
         e.preventDefault();
         return actions.current.setViewMode(view);
@@ -614,7 +618,7 @@ export default function App() {
       // Settings apply right away, even while a dialog holds the file-action lock.
       if (group === "theme" && isThemeSetting(value)) void actions.current.setTheme(value);
       else if (group === "accent" && isAccentSetting(value)) void actions.current.setAccent(value);
-      else if (group === "view" && (value === "editor" || value === "split" || value === "preview")) actions.current.setViewMode(value);
+      else if (group === "view" && isViewMode(value)) actions.current.setViewMode(value);
       else if (id === "autosave") void actions.current.setAutosave(!autosaveOn.current);
       else if (id === "spellcheck") void actions.current.setSpellCheckSetting(!spellCheckOn.current);
       else run(id);
@@ -697,6 +701,7 @@ export default function App() {
   // Scroll sync only makes sense with both panes on screen.
   useEffect(() => {
     scrollSync.current?.setEnabled(viewMode === "split");
+    setRich(viewMode === "rich", editor.current?.view ?? null);
   }, [viewMode]);
 
   // Closing the window asks about each unsaved tab in turn.
@@ -797,7 +802,7 @@ export default function App() {
             source={source}
             baseDir={dirOf(doc.path)}
             docId={activeId.current}
-            hidden={viewMode === "editor"}
+            hidden={viewMode === "editor" || viewMode === "rich"}
             onRendered={() => scrollSync.current?.afterRender()}
             onOpenFile={(path) => void exclusive(() => openPath(path))}
           />
