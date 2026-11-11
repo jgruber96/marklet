@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
-import { isTauri } from "@tauri-apps/api/core";
-import { Menu } from "@tauri-apps/api/menu";
+import { showMenu as popUp, type MenuItem } from "../../components/PopupMenu";
 import { ChevronDown, ChevronRight, FilePlus, FileText, Folder, FolderOpen } from "lucide-react";
 import type { TreeNode } from "../stores/workspace";
 import { baseName, samePath } from "../paths";
@@ -55,26 +54,27 @@ export function FileTree(props: FileTreeProps) {
     setEditing({ kind: "new", dir });
   };
 
-  const showMenu = async (e: MouseEvent, node: TreeNode | null) => {
+  const showMenu = (e: MouseEvent, node: TreeNode | null) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isTauri()) return;
     const dir = node ? (node.isDir ? node.path : null) : root;
-    const items = [
-      ...(node && !node.isDir ? [{ text: "Open", action: () => props.onOpenFile(node.path) }] : []),
-      ...(dir ? [{ text: "New File…", action: () => startNew(dir) }] : []),
+    const items: MenuItem[] = [
+      ...(node && !node.isDir ? [{ label: "Open", action: () => props.onOpenFile(node.path) }] : []),
+      ...(dir ? [{ label: "New File…", action: () => startNew(dir) }] : []),
       ...(node
         ? [
-            { item: "Separator" as const },
-            { text: "Rename…", action: () => setEditing({ kind: "rename", path: node.path }) },
-            { text: "Delete", action: () => props.onDelete(node) },
+            { separator: true as const },
+            { label: "Rename…", shortcut: "F2", action: () => setEditing({ kind: "rename", path: node.path }) },
+            { label: "Delete", shortcut: "Del", action: () => props.onDelete(node) },
           ]
         : []),
-      { item: "Separator" as const },
-      { text: revealLabel, action: () => props.onReveal(node?.path ?? root) },
+      { separator: true as const },
+      { label: revealLabel, action: () => props.onReveal(node?.path ?? root) },
     ];
-    const menu = await Menu.new({ items });
-    await menu.popup();
+    // The keyboard's menu key reports no pointer position: open at the row instead.
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const keyboard = e.clientX === 0 && e.clientY === 0;
+    popUp(items, keyboard ? { x: box.left + 24, y: box.bottom } : { x: e.clientX, y: e.clientY }, { keyboard });
   };
 
   const onRowKey = (e: KeyboardEvent, node: TreeNode) => {

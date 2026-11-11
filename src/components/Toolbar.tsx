@@ -12,17 +12,18 @@ import {
   Menu as MenuIcon,
   SquarePen,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { useEffect, useRef, useState } from "react";
+import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { showMenu, type MenuItem } from "./PopupMenu";
 import appIcon from "../assets/icon.svg";
-import { LogicalPosition } from "@tauri-apps/api/dpi";
-import { Menu } from "@tauri-apps/api/menu";
 import type { ViewMode } from "../lib/stores/settings";
 import type { ExportKind } from "../lib/export/export";
 import type { FormatKind } from "../lib/editor/format";
 
 interface ToolbarProps {
+  /** The app menu (File, Edit, View, Settings), built when it is opened. */
+  menu(): MenuItem[];
   /** The open file's name and whether it has unsaved changes, for the title in the bar. */
   title: string;
   dirty: boolean;
@@ -96,25 +97,29 @@ const formatting: { kind: FormatKind; icon: typeof Bold; label: string; key?: st
   { kind: "bullet", icon: List, label: "Bulleted list" },
 ];
 
-export function Toolbar({ title, dirty, viewMode, onViewMode, onNew, onOpen, onOpenFolder, onFormat, onExport }: ToolbarProps) {
-  // A native dropdown under the button, so it looks and keys like the menu bar.
-  const showExportMenu = async (button: HTMLElement) => {
-    if (!isTauri()) return onExport("html");
+export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpen, onOpenFolder, onFormat, onExport }: ToolbarProps) {
+  /** Opens a menu under a toolbar button; `keyboard` when it was opened with a key rather than the mouse. */
+  const dropDown = (button: HTMLElement, items: MenuItem[], keyboard: boolean, align: "left" | "right" = "left") => {
     const box = button.getBoundingClientRect();
-    const menu = await Menu.new({
-      items: [
-        { text: "HTML…", action: () => onExport("html") },
-        { text: "PDF…", action: () => onExport("pdf") },
-      ],
-    });
-    await menu.popup(new LogicalPosition(box.left, box.bottom + 2));
+    // Right-aligned menus are pushed back inside the window by the menu itself.
+    showMenu(items, { x: align === "left" ? box.left : box.right - 180, y: box.bottom + 4 }, { keyboard });
   };
 
-  /** File, Edit, View and Settings, as a native menu under the button. */
-  const showAppMenu = (button: HTMLElement) => {
-    const box = button.getBoundingClientRect();
-    void invoke("popup_app_menu", { x: box.left, y: box.bottom + 2 });
-  };
+  const showExportMenu = (button: HTMLElement, keyboard: boolean) =>
+    dropDown(
+      button,
+      [
+        { label: "Export as HTML…", shortcut: `${mod}Shift+E`, action: () => onExport("html") },
+        { label: "Export as PDF…", shortcut: `${mod}P`, action: () => onExport("pdf") },
+      ],
+      keyboard,
+      "right",
+    );
+
+  /** File, Edit, View and Settings, under the menu button. */
+  const latestMenu = useRef(menu);
+  latestMenu.current = menu;
+  const showAppMenu = (button: HTMLElement, keyboard: boolean) => dropDown(button, latestMenu.current(), keyboard);
 
   // F10 opens the menu, as it does for a menu bar.
   useEffect(() => {
@@ -124,7 +129,7 @@ export function Toolbar({ title, dirty, viewMode, onViewMode, onNew, onOpen, onO
       const button = document.querySelector<HTMLElement>(".toolbar .menu-button");
       if (!button) return;
       e.preventDefault();
-      showAppMenu(button);
+      showAppMenu(button, true);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -135,7 +140,7 @@ export function Toolbar({ title, dirty, viewMode, onViewMode, onNew, onOpen, onO
       {ownTitleBar && (
         <>
           <img className="app-icon" src={appIcon} alt="" draggable={false} {...drag} />
-          <button className="tb-btn icon menu-button" aria-label="Menu" aria-haspopup="menu" title="Menu: File, Edit, View, Settings (F10)" onClick={(e) => showAppMenu(e.currentTarget)}>
+          <button className="tb-btn icon menu-button" aria-label="Menu" aria-haspopup="menu" title="Menu: File, Edit, View, Settings (F10)" onClick={(e) => showAppMenu(e.currentTarget, e.detail === 0)}>
             <MenuIcon size={16} />
           </button>
           <div className="tb-sep" />
@@ -197,7 +202,7 @@ export function Toolbar({ title, dirty, viewMode, onViewMode, onNew, onOpen, onO
         aria-haspopup="menu"
         aria-label="Export"
         title={`Export as HTML (${mod}Shift+E) or PDF (${mod}P)`}
-        onClick={(e) => void showExportMenu(e.currentTarget)}
+        onClick={(e) => showExportMenu(e.currentTarget, e.detail === 0)}
       >
         <Download size={16} />
         <ChevronDown size={14} />

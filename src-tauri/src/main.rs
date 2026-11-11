@@ -44,12 +44,11 @@ fn main() {
         .setup(|app| {
             carry_over_settings(app.handle());
             let menu = menu::build(app.handle())?;
+            // macOS shows it as the menu bar. On Windows the window has no native frame
+            // (tauri.windows.conf.json): the front end draws the same menu itself, under a
+            // toolbar button, and handles the shortcuts.
             if cfg!(target_os = "macos") {
                 app.set_menu(menu)?;
-            } else {
-                // No menu bar: the window has no native frame (tauri.windows.conf.json), and the
-                // menus open from the toolbar. Shortcuts are handled by the front end.
-                app.manage(menu::AppMenu(menu));
             }
             launch::open_files(app.handle(), launch::files_from_args(std::env::args()));
             Ok(())
@@ -69,7 +68,6 @@ fn main() {
             fs::path_kind,
             fs::search_folder,
             menu::set_recent_menu,
-            menu::popup_app_menu,
             recovery::recovery_write,
             recovery::recovery_remove,
             recovery::recovery_list,

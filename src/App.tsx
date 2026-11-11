@@ -39,6 +39,8 @@ import {
   saveSpellCheck,
   loadTheme,
   isViewMode,
+  ACCENTS,
+  ACCENT_LABELS,
   DEFAULT_LOOK,
   type Look,
   applyLook,
@@ -77,7 +79,7 @@ import {
 } from "./lib/stores/workspace";
 import { loadSession, saveSession } from "./lib/tabs/session";
 import { leftBehind, removeRecovery, writeRecovery } from "./lib/tabs/recovery";
-import { dirOf, isInside, isMarkdownPath, joinPath, reroot, samePath, withMarkdownExt } from "./lib/paths";
+import { baseName, dirOf, isInside, isMarkdownPath, joinPath, reroot, samePath, withMarkdownExt } from "./lib/paths";
 import { Preview, type PreviewHandle } from "./lib/preview/Preview";
 import { ScrollSync } from "./lib/preview/scrollSync";
 import { Toolbar } from "./components/Toolbar";
@@ -85,6 +87,9 @@ import { TabStrip } from "./components/TabStrip";
 import { StatusBar } from "./components/StatusBar";
 import { Splitter } from "./components/Splitter";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { PopupMenuHost, type MenuItem } from "./components/PopupMenu";
+
+const isMac = navigator.userAgent.includes("Mac");
 
 const SIDEBAR_MIN = 180;
 const SIDEBAR_MAX = 420;
@@ -787,7 +792,7 @@ export default function App() {
     for (const path of paths) await openPath(path);
   };
 
-  const handlers = { commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, setSpellCheckSetting, confirmDiscard, openFiles, readyToRestart, leaveCleanly, stepZoom, dropped, openRecent, setRecent, findInFolder };
+  const handlers = { commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, setSpellCheckSetting, confirmDiscard, openFiles, readyToRestart, leaveCleanly, stepZoom, dropped, openRecent, setRecent, findInFolder, menuChosen: (id: string) => menuChosen(id) };
   const actions = useRef(handlers);
   actions.current = handlers;
 
@@ -856,24 +861,119 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey, true);
   }, []);
 
+  /**
+   * A menu item was chosen, by id: from the app menu drawn in the window
+   * (Windows) or from the native menu bar (macOS, as a "menu" event).
+   */
+  const menuChosen = (id: string) => {
+    const [group, value] = id.split(":");
+    // Settings apply right away, even while a dialog holds the file-action lock.
+    if (group === "theme" && isThemeSetting(value)) void setTheme(value);
+    else if (group === "accent" && isAccentSetting(value)) void setAccent(value);
+    else if (group === "view" && isViewMode(value)) setViewMode(value);
+    else if (group === "recent" && value === "clear") setRecent([]);
+    else if (group === "recent") void exclusive(() => openRecent(Number(value)));
+    else if (id === "zoom-in" || id === "zoom-out" || id === "zoom-reset") stepZoom(id === "zoom-in" ? 1 : id === "zoom-out" ? -1 : 0);
+    else if (id === "find-in-folder") findInFolder();
+    else if (id === "settings") setSettingsOpen(true);
+    else if (id === "autosave") void setAutosave(!autosaveOn.current);
+    else if (id === "spellcheck") void setSpellCheckSetting(!spellCheckOn.current);
+    else if (id === "quit") void getCurrentWindow().close(); // asks about unsaved tabs, like the window's own Close
+    else run(id);
+  };
+
+  /** The app menu as drawn in the window: File, Edit, View and Settings. Built when it opens, so its ticks are current. */
+  const appMenu = (): MenuItem[] => {
+    const key = (keys: string) => (isMac ? keys.replace("Ctrl+", "⌘").replace("Shift+", "⇧") : keys);
+    const item = (id: string, label: string, keys?: string, extra: Partial<Exclude<MenuItem, { separator: true }>> = {}): MenuItem => ({
+      label,
+      shortcut: keys && key(keys),
+      action: () => menuChosen(id),
+      ...extra,
+    });
+    const sep: MenuItem = { separator: true };
+    const files = recent.current;
+    return [
+      {
+        label: "File",
+        submenu: [
+          item("new", "New", "Ctrl+N"),
+          item("open", "Open…", "Ctrl+O"),
+          {
+            label: "Open Recent",
+            submenu: files.length
+              ? [
+                  // The file's name, with its folder at the right; the full path is the tooltip.
+                  ...files.map((path, i) => item(`recent:${i}`, baseName(path), undefined, { title: path, shortcut: baseName(dirOf(path) ?? "") })),
+                  sep,
+                  item("recent:clear", "Clear Recent"),
+                ]
+              : [{ label: "No Recent Files", disabled: true }],
+          },
+          item("open-folder", "Open Folder…", "Ctrl+Shift+O"),
+          item("close-folder", "Close Folder", undefined, { disabled: !root.current }),
+          sep,
+          item("save", "Save", "Ctrl+S"),
+          item("save-as", "Save As…", "Ctrl+Shift+S"),
+          sep,
+          item("export-html", "Export as HTML…", "Ctrl+Shift+E"),
+          item("export-pdf", "Export as PDF…", "Ctrl+P"),
+          sep,
+          item("close-tab", "Close Tab", "Ctrl+W"),
+          sep,
+          item("quit", "Exit"),
+        ],
+      },
+      {
+        label: "Edit",
+        submenu: [item("find", "Find and Replace…", "Ctrl+F"), item("find-in-folder", "Find in Folder…", "Ctrl+Shift+F")],
+      },
+      {
+        label: "View",
+        submenu: [
+          ...(
+            [
+              ["editor", "Editor Only", "Ctrl+1"],
+              ["split", "Split", "Ctrl+2"],
+              ["preview", "Preview Only", "Ctrl+3"],
+              ["rich", "Rich", "Ctrl+4"],
+            ] as const
+          ).map(([mode, label, keys]) => item(`view:${mode}`, label, keys, { checked: viewMode === mode, radio: true })),
+          sep,
+          item("zoom-in", "Zoom In", "Ctrl+="),
+          item("zoom-out", "Zoom Out", "Ctrl+-"),
+          item("zoom-reset", "Actual Size", "Ctrl+0"),
+        ],
+      },
+      {
+        label: "Settings",
+        submenu: [
+          item("settings", "Settings…", "Ctrl+,"),
+          sep,
+          {
+            label: "Theme",
+            submenu: (["system", "light", "dark"] as const).map((value) =>
+              item(`theme:${value}`, value[0].toUpperCase() + value.slice(1), undefined, { checked: theme.current === value, radio: true }),
+            ),
+          },
+          {
+            label: "Accent Color",
+            submenu: ACCENTS.map((value) => item(`accent:${value}`, ACCENT_LABELS[value], undefined, { checked: accent.current === value, radio: true })),
+          },
+          sep,
+          item("autosave", "Autosave", undefined, { checked: autosave }),
+          item("spellcheck", "Spell Check", undefined, { checked: spellCheckOn.current }),
+          sep,
+          item("check-updates", "Check for Updates…"),
+        ],
+      },
+    ];
+  };
+
   // Native menu items arrive as a "menu" event carrying the item id.
   useEffect(() => {
     if (!isTauri()) return;
-    const unlisten = listen<string>("menu", ({ payload: id }) => {
-      const [group, value] = id.split(":");
-      // Settings apply right away, even while a dialog holds the file-action lock.
-      if (group === "theme" && isThemeSetting(value)) void actions.current.setTheme(value);
-      else if (group === "accent" && isAccentSetting(value)) void actions.current.setAccent(value);
-      else if (group === "view" && isViewMode(value)) actions.current.setViewMode(value);
-      else if (group === "recent" && value === "clear") actions.current.setRecent([]);
-      else if (group === "recent") void exclusive(() => actions.current.openRecent(Number(value)));
-      else if (id === "zoom-in" || id === "zoom-out" || id === "zoom-reset") actions.current.stepZoom(id === "zoom-in" ? 1 : id === "zoom-out" ? -1 : 0);
-      else if (id === "find-in-folder") actions.current.findInFolder();
-      else if (id === "settings") setSettingsOpen(true);
-      else if (id === "autosave") void actions.current.setAutosave(!autosaveOn.current);
-      else if (id === "spellcheck") void actions.current.setSpellCheckSetting(!spellCheckOn.current);
-      else run(id);
-    });
+    const unlisten = listen<string>("menu", ({ payload: id }) => actions.current.menuChosen(id));
     const unwatch = listen<string[]>("fs-change", ({ payload }) => actions.current.onFsChange(payload));
     // Files double-clicked in Explorer or Finder while the app is running.
     const unopen = listen<string[]>("open-files", ({ payload }) => void exclusive(() => actions.current.openFiles(payload), true));
@@ -1015,6 +1115,7 @@ export default function App() {
   return (
     <div className="app">
       <Toolbar
+        menu={appMenu}
         title={name}
         dirty={dirty}
         viewMode={viewMode}
@@ -1117,6 +1218,8 @@ export default function App() {
           }}
         />
       )}
+
+      <PopupMenuHost />
 
       <StatusBar doc={doc} dirty={dirty} autosave={autosave} {...cursor} words={words} zoom={zoom} />
     </div>

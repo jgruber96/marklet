@@ -27,18 +27,6 @@ const RADIO_GROUPS: [&str; 3] = ["theme", "accent", "view"];
 /// so their ticks can follow the front end's settings.
 pub struct CheckItems(Vec<(String, CheckMenuItem<Wry>)>);
 
-/// The whole menu, where it is not a menu bar: on Windows the app draws its own
-/// title bar, and the menus open from a button in it (`popup_app_menu`).
-pub struct AppMenu(pub Menu<Wry>);
-
-/// Opens the app menu under the toolbar's menu button (window coordinates, logical pixels).
-#[tauri::command]
-pub fn popup_app_menu(window: tauri::Window, x: f64, y: f64) -> Result<(), String> {
-    use tauri::menu::ContextMenu;
-    let Some(menu) = window.app_handle().try_state::<AppMenu>() else { return Ok(()) };
-    menu.0.popup_at(window.clone(), tauri::LogicalPosition::new(x, y)).map_err(|e| e.to_string())
-}
-
 /// File › Open Recent, refilled by the front end (`set_recent_menu`).
 pub struct RecentMenu(Submenu<Wry>);
 
