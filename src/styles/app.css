@@ -875,3 +875,63 @@ body.resizing * {
     display: none !important;
   }
 }
+
+/* Windows: the toolbar is the window's title bar (see Toolbar.tsx). */
+
+.toolbar.titlebar {
+  padding-right: 0;
+}
+
+.app-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0 8px 0 2px;
+}
+
+.tb-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+  padding: 0 12px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tb-title-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.win-buttons {
+  display: flex;
+  align-self: stretch;
+  flex: none;
+  margin: -2px 0 0 8px;
+}
+
+.win-buttons button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+}
+
+.win-buttons button:hover {
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+  color: var(--text);
+}
+
+.win-buttons button.close:hover {
+  background: #e81123;
+  color: #fff;
+}

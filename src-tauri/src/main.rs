@@ -31,7 +31,12 @@ fn main() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // Size and position are remembered; whether the window has a native frame is the app's choice, not saved state.
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(tauri_plugin_window_state::StateFlags::all() - tauri_plugin_window_state::StateFlags::DECORATIONS)
+                .build(),
+        )
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(watcher::FolderWatcher::default())
@@ -39,7 +44,13 @@ fn main() {
         .setup(|app| {
             carry_over_settings(app.handle());
             let menu = menu::build(app.handle())?;
-            app.set_menu(menu)?;
+            if cfg!(target_os = "macos") {
+                app.set_menu(menu)?;
+            } else {
+                // No menu bar: the window has no native frame (tauri.windows.conf.json), and the
+                // menus open from the toolbar. Shortcuts are handled by the front end.
+                app.manage(menu::AppMenu(menu));
+            }
             launch::open_files(app.handle(), launch::files_from_args(std::env::args()));
             Ok(())
         })
@@ -58,6 +69,7 @@ fn main() {
             fs::path_kind,
             fs::search_folder,
             menu::set_recent_menu,
+            menu::popup_app_menu,
             recovery::recovery_write,
             recovery::recovery_remove,
             recovery::recovery_list,

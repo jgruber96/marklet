@@ -1015,6 +1015,8 @@ export default function App() {
   return (
     <div className="app">
       <Toolbar
+        title={name}
+        dirty={dirty}
         viewMode={viewMode}
         onViewMode={setViewMode}
         onNew={() => run("new")}
