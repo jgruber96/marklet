@@ -27,7 +27,7 @@ A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Taur
 - **Formatting** buttons and shortcuts, plus autosave after 2 seconds idle
 - **Export** to a standalone HTML file or to PDF
 - **Settings window** (Ctrl+,): theme, accent, editor and reading fonts, text size, line width, autosave and spell check
-- **Its own title bar** on Windows: the toolbar is the top of the window, with the menus behind a button (F10)
+- **Its own title bar** on Windows: the toolbar is the top of the window, with the menus behind a button (F10), drawn in the app's own look
 - **Light and dark** themes that follow the OS, with an override and six accent presets (Aurora by default), each with its own glow
 
 ## Screenshots
