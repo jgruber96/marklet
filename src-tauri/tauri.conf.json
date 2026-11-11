@@ -48,6 +48,9 @@
     "publisher": "DarkstarDEV",
     "copyright": "DarkstarDEV",
     "category": "Productivity",
+    "macOS": {
+      "minimumSystemVersion": "13.0"
+    },
     "shortDescription": "Markdown editor",
     "icon": [
       "icons/32x32.png",

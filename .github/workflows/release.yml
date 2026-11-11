@@ -1,34 +1,51 @@
-# Builds, signs and publishes a release when a version tag is pushed:
+# Builds Marklet for Windows and macOS (Apple Silicon).
 #
-#   git tag v0.4.0 && git push origin v0.4.0
+# Pushing a version tag builds, signs and publishes a release:
+#
+#   git tag -a v0.5.0 -m "What changed"
+#   git push origin main v0.5.0
 #
 # The tag must match the version in package.json, src-tauri/tauri.conf.json
-# and src-tauri/Cargo.toml. The release notes are the tag's message (use
-# `git tag -a v0.4.0 -m "What changed"`), or GitHub's generated notes.
+# and src-tauri/Cargo.toml. The tag's message becomes the release notes and
+# the text of the update prompt (GitHub's generated notes if it has none).
 #
-# Needs one repository secret, TAURI_SIGNING_PRIVATE_KEY: the contents of the
-# update signing key (see README, "Releasing an update"). Installed copies only
-# accept updates signed with it.
+# Run it by hand (Actions > Release > Run workflow) for a test build: the
+# installers are attached to the run as artifacts, and nothing is published.
+#
+# Repository secrets:
+#   TAURI_SIGNING_PRIVATE_KEY   the update signing key. Required: installed
+#                               copies only accept updates signed with it.
+#   APPLE_CERTIFICATE           the Developer ID Application certificate and
+#   APPLE_CERTIFICATE_PASSWORD  its private key, as a base64 .p12 and its
+#   APPLE_SIGNING_IDENTITY      password, and the certificate's name.
+#   APPLE_API_ISSUER            an App Store Connect API key, for
+#   APPLE_API_KEY               notarization: its issuer ID, key ID and the
+#   APPLE_API_KEY_P8            contents of the AuthKey_<id>.p8 file.
+# Without the Apple secrets the Mac app is built unsigned (ad hoc): it runs,
+# but macOS asks before opening it the first time.
 name: Release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+          - platform: macos
+            os: macos-latest # Apple Silicon
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # the tag's message is the release notes
-
-      # The checkout keeps only the tagged commit; fetch the tag itself for its message.
-      - run: git fetch --force origin "refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}"
-        shell: bash
 
       - uses: actions/setup-node@v4
         with:
@@ -41,6 +58,7 @@ jobs:
       - run: npm ci
 
       - name: Check the tag against the app version
+        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
           tag="${GITHUB_REF_NAME#v}"
@@ -54,36 +72,103 @@ jobs:
           fi
 
       - name: Tests
+        shell: bash
         run: |
           npm test
           cargo test --manifest-path src-tauri/Cargo.toml
 
-      - name: Build and sign the installers
+      - name: Build and sign
+        shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
-        shell: bash
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         run: |
           if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
             echo "::error::The TAURI_SIGNING_PRIVATE_KEY secret is not set."
             exit 1
           fi
+          # Tauri reads the Apple settings from these variables; an empty one counts as set.
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_API_ISSUER APPLE_API_KEY; do
+            [ -z "${!name}" ] && unset "$name"
+          done
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            if [ -n "$APPLE_CERTIFICATE" ]; then
+              if [ -n "$APPLE_API_KEY_P8" ] && [ -n "$APPLE_API_KEY" ] && [ -n "$APPLE_API_ISSUER" ]; then
+                export APPLE_API_KEY_PATH="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY.p8"
+                printf '%s\n' "$APPLE_API_KEY_P8" > "$APPLE_API_KEY_PATH"
+                echo "Signing with the Developer ID certificate and notarizing."
+              else
+                unset APPLE_API_KEY APPLE_API_ISSUER
+                echo "::warning::Signed but not notarized: the App Store Connect API key secrets are not set."
+              fi
+            else
+              unset APPLE_API_KEY APPLE_API_ISSUER
+              export APPLE_SIGNING_IDENTITY="-"
+              echo "::warning::Built unsigned (ad hoc): the Apple certificate secrets are not set."
+            fi
+          fi
+          unset APPLE_API_KEY_P8
           npm run tauri build
+
+      - name: Collect the installers and update files
+        shell: bash
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          bundle=src-tauri/target/release/bundle
+          mkdir -p out
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cp "$bundle/nsis/Marklet_${version}_x64-setup.exe" "$bundle/nsis/Marklet_${version}_x64-setup.exe.sig" out/
+            cp "$bundle/msi/Marklet_${version}_x64_en-US.msi" out/
+          else
+            cp "$bundle/dmg/Marklet_${version}_aarch64.dmg" out/
+            # Installed Macs update from the app itself, packed; named per version on the release.
+            cp "$bundle/macos/Marklet.app.tar.gz" "out/Marklet_${version}_aarch64.app.tar.gz"
+            cp "$bundle/macos/Marklet.app.tar.gz.sig" "out/Marklet_${version}_aarch64.app.tar.gz.sig"
+          fi
+          ls -l out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: marklet-${{ matrix.platform }}
+          path: out/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The checkout keeps only the tagged commit; fetch the tag itself for its message.
+      - run: git fetch --force origin "refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
 
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
         run: |
           version="${GITHUB_REF_NAME#v}"
-          # An annotated tag's message becomes the notes, in the release and in the update prompt.
           notes=""
           if [ "$(git cat-file -t "$GITHUB_REF_NAME")" = "tag" ]; then
             notes=$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")
           fi
-          node scripts/latest-json.mjs "$notes"
-          bundle=src-tauri/target/release/bundle
-          files=("$bundle/nsis/Marklet_${version}_x64-setup.exe" "$bundle/msi/Marklet_${version}_x64_en-US.msi" installers/latest.json)
+          node scripts/latest-json.mjs "$notes" --dir out
+          files=(out/*.exe out/*.msi out/*.dmg out/*.app.tar.gz installers/latest.json)
+          ls -l "${files[@]}"
           if [ -n "$notes" ]; then
             gh release create "$GITHUB_REF_NAME" "${files[@]}" --title "Marklet $version" --notes "$notes"
           else

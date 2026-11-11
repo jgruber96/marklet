@@ -1,5 +1,5 @@
-# Checks every push and pull request: types, front-end tests, production
-# build, and the Rust tests.
+# Checks every push and pull request on Windows and macOS: types, front-end
+# tests, production build, and the Rust tests.
 name: CI
 
 on:
@@ -16,7 +16,11 @@ permissions:
 
 jobs:
   check:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
