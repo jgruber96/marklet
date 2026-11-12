@@ -4,7 +4,7 @@ A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Taur
 
 ![Marklet in dark mode: file tree and outline on the left, Markdown source and live preview side by side](docs/screenshots/split-dark.png)
 
-**[Download for Windows](https://github.com/jgruber96/marklet/releases/latest)** (installer about 7 MB). The macOS build is still to come.
+**[Download](https://github.com/jgruber96/marklet/releases/latest)** for Windows (the `.exe` installer, about 7 MB) or macOS 13+ on Apple Silicon (the `.dmg`, about 10 MB).
 
 ## Features
 
@@ -62,20 +62,33 @@ Each platform builds its own installers: on Windows, an `.msi` and an NSIS `.exe
 npm run tauri build -- --target aarch64-apple-darwin
 ```
 
-Builds are unsigned, so Windows SmartScreen and macOS Gatekeeper warn on first launch. Both register `.md` and `.markdown` files to open in Marklet.
+Both register `.md` and `.markdown` files to open in Marklet. Released Mac builds are signed with a Developer ID and notarized by Apple, so they open without a warning; local builds and the Windows installer are not code-signed, so Gatekeeper or SmartScreen warns on first launch.
 
 ## Releasing an update
 
 Installed copies check the newest GitHub release at startup (and from Settings › Check for Updates) and offer to install it. An update is only accepted if it was signed with the project's private update key, so a build needs that key.
 
-**Automated** (`.github/workflows/release.yml`): set the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, commit, then push a tag. GitHub builds, tests, signs and publishes the release; the tag's message becomes the release notes and the text of the update prompt.
+**Automated** (`.github/workflows/release.yml`): set the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, commit, then push a tag. GitHub builds Windows and macOS side by side, tests, signs and notarizes them, and publishes one release with both; the tag's message becomes the release notes and the text of the update prompt.
 
 ```bash
 git tag -a v0.4.0 -m "What changed"
 git push origin main v0.4.0
 ```
 
-This needs the key stored once as the repository secret `TAURI_SIGNING_PRIVATE_KEY` (`gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/marklet.key`). Every push also runs the checks in `.github/workflows/ci.yml`: type check, front-end tests (`npm test`), production build and `cargo test`.
+Running the workflow by hand (Actions › Release › Run workflow) makes a test build instead: the installers are attached to the run, and nothing is published.
+
+It needs these repository secrets, set once:
+
+| Secret | What it is |
+| --- | --- |
+| `TAURI_SIGNING_PRIVATE_KEY` | The update signing key (`~/.tauri/marklet.key`). Required. |
+| `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD` | The Developer ID Application certificate with its private key, as a base64 `.p12`, and that file's password. |
+| `APPLE_SIGNING_IDENTITY` | The certificate's name, `Developer ID Application: <name> (<team id>)`. |
+| `APPLE_API_ISSUER`, `APPLE_API_KEY`, `APPLE_API_KEY_P8` | An App Store Connect API key used for notarization: its issuer ID, key ID, and the contents of its `AuthKey_<key id>.p8`. |
+
+Without the Apple secrets the Mac app is still built, unsigned. The certificate's private key, the certificate and the `.p8` are kept in `~/.apple` on the release PC and backed up with the update key; the certificate expires in December 2027, when a new one has to be made and the Apple secrets set again.
+
+Every push also runs the checks in `.github/workflows/ci.yml` on Windows and macOS: type check, front-end tests (`npm test`), production build and `cargo test`.
 
 **By hand**, on a PC that has the key file:
 
@@ -89,9 +102,9 @@ This needs the key stored once as the repository secret `TAURI_SIGNING_PRIVATE_K
    ```
 
 3. Write `installers/latest.json`: `node scripts/latest-json.mjs "What changed"`.
-4. Create the GitHub release tagged `v<version>` and attach `Marklet_<version>_x64-setup.exe`, the `.msi`, and `latest.json`.
+4. Create the GitHub release tagged `v<version>` and attach `Marklet_<version>_x64-setup.exe`, the `.msi`, and `latest.json`. (This covers Windows only; a Mac build needs a Mac, so use the automated release for both.)
 
-Back up the key file. If it is lost, installed copies can no longer be updated automatically and need a manual reinstall with a new key. Version 0.1.0 has no updater; it is replaced by installing 0.2.0 by hand. Auto-update is Windows-only until a macOS build is added to `latest.json`.
+Back up the key file. If it is lost, installed copies can no longer be updated automatically and need a manual reinstall with a new key. Version 0.1.0 has no updater; it is replaced by installing 0.2.0 by hand. Macs auto-update from the first release that includes the Mac build (0.5.0).
 
 ## Keyboard shortcuts
 
@@ -117,14 +130,15 @@ Ctrl on Windows, Cmd on macOS.
 
 ## macOS test checklist
 
-Not yet run on a Mac. On macOS 13+ (Apple Silicon), check:
+Run on macOS 13+ (Apple Silicon) with the first signed build (November 2026); repeat it for changes that touch menus, files or export. On the Mac, Marklet keeps the system title bar and menu bar (the custom title bar and popup app menu are Windows-only).
 
-- [ ] The app menu holds Settings (Theme, Accent Color, Autosave) and Quit; Cmd+C/V/X/Z work in the editor
-- [ ] Open Folder, tree new/rename/delete (to the Trash), and outside edits appearing without a restart
-- [ ] Closing an unsaved tab and quitting with Cmd+Q both ask to save
-- [ ] Export as PDF opens the print dialog; its PDF button saves a light-themed copy of the preview
-- [ ] Export as HTML opens in Safari looking like the preview
-- [ ] Double-clicking a `.md` file in Finder opens it, both when Marklet is closed and when it is running
+- [x] The signed, notarized app opens without a Gatekeeper warning
+- [x] The app menu holds Settings (Theme, Accent Color, Autosave) and Quit; Cmd+C/V/X/Z work in the editor
+- [x] Open Folder, tree new/rename/delete (to the Trash), and outside edits appearing without a restart
+- [x] Closing an unsaved tab and quitting with Cmd+Q both ask to save
+- [x] Export as PDF opens the print dialog; its PDF button saves a light-themed copy of the preview
+- [x] Export as HTML opens in Safari looking like the preview
+- [x] Double-clicking a `.md` file in Finder opens it, both when Marklet is closed and when it is running
 
 ## Status
 
@@ -138,6 +152,7 @@ Not yet run on a Mac. On macOS 13+ (Apple Silicon), check:
 - [x] 8. Image paste: pasted images saved beside the document in `assets/` and linked with a relative path
 - [x] 9. Spell check: the web view's checker on prose only, with a Settings toggle
 - [x] 10. Auto-update: signed updates from GitHub Releases, checked at startup and from the Settings menu
+- [x] 20. macOS: signed and notarized Apple Silicon builds from the release workflow, with auto-update; tested on a Mac
 - [x] 19. Custom title bar and new icon: on Windows the window has no native frame; the toolbar carries the icon, a menu button, the title and the window buttons
 - [x] 18. Rich view finish: tables edited in place (Tab between cells, add and remove rows and columns), and tables, diagrams and formulas drawn inside lists and quotes
 - [x] 17. Settings window: one dialog for appearance, fonts, text size, line width and editing options (the Settings menu keeps its quick toggles)
