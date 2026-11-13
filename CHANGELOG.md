@@ -2,7 +2,7 @@
 
 What changed in each version of Marklet. Installed copies from 0.2.0 on update themselves.
 
-## Unreleased
+## 0.6.0 (2026-11-13)
 
 - **Accessibility:** the editor, tabs, outline, file tree and task boxes are named for screen readers; tabs work from the keyboard (Left / Right, Enter, Delete); text on the glow and the document title in the light theme are easier to read; animations stop when the system asks for reduced motion; current items are outlined in Windows high-contrast themes.
 - **Safety net:** a smoke test drives the real app through its main features before a release can be published.
