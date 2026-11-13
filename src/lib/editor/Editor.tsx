@@ -19,6 +19,7 @@ import { pastedImages } from "./images";
 import { spellCheck } from "./spellcheck";
 import { richView } from "./rich";
 import { smartEditing } from "./smart";
+import { focusMode } from "./focus";
 
 export interface EditorHandle {
   /** A fresh state (own undo history) for a tab that isn't shown yet. */
@@ -67,6 +68,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(prop
         spellCheck,
         richView,
         smartEditing,
+        focusMode,
         // Find and replace bar (Ctrl/Cmd+F) above the text.
         search({ top: true }),
         highlightSelectionMatches(),

@@ -82,6 +82,8 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     }
     let view = view
         .separator()
+        .item(&item("focus", "Focus Mode", Some("CmdOrCtrl+Shift+Enter"))?)
+        .separator()
         .item(&item("zoom-in", "Zoom In", Some("CmdOrCtrl+="))?)
         .item(&item("zoom-out", "Zoom Out", Some("CmdOrCtrl+-"))?)
         .item(&item("zoom-reset", "Actual Size", Some("CmdOrCtrl+0"))?)

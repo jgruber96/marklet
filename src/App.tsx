@@ -13,6 +13,7 @@ import { importImages, isImagePath, saveImages } from "./lib/editor/images";
 import type { SearchHit } from "./lib/sidebar/FolderSearch";
 import { setSpellCheck } from "./lib/editor/spellcheck";
 import { configureRich, setRich } from "./lib/editor/rich";
+import { setFocusMode } from "./lib/editor/focus";
 import { openSearchPanel } from "@codemirror/search";
 import { checkForUpdate } from "./lib/update";
 import { Sidebar } from "./lib/sidebar/Sidebar";
@@ -141,6 +142,9 @@ export default function App() {
   const [zoom, setZoomState] = useState(1);
   const [searchFocus, setSearchFocus] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Focus mode: the window shows only the text, full screen (View › Focus Mode). */
+  const [focus, setFocusState] = useState(false);
+  const focusOn = useRef(false);
   const [look, setLookState] = useState<Look>(DEFAULT_LOOK);
   /** File › Open Recent, most recent first. */
   const recent = useRef<string[]>([]);
@@ -667,6 +671,15 @@ export default function App() {
     if (images.length) await insertImages((dir) => importImages(images, dir), at);
   };
 
+  const toggleFocus = () => {
+    const on = !focusOn.current;
+    focusOn.current = on;
+    setFocusState(on);
+    setFocusMode(on, editor.current?.view ?? null);
+    if (isTauri()) void getCurrentWindow().setFullscreen(on).catch(console.warn);
+    editor.current?.focus();
+  };
+
   /** Puts the cursor in the sidebar's search box (not a file action: those hand focus back to the editor). */
   const findInFolder = () => {
     if (root.current) return setSearchFocus((n) => n + 1);
@@ -792,7 +805,7 @@ export default function App() {
     for (const path of paths) await openPath(path);
   };
 
-  const handlers = { commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, setSpellCheckSetting, confirmDiscard, openFiles, readyToRestart, leaveCleanly, stepZoom, dropped, openRecent, setRecent, findInFolder, menuChosen: (id: string) => menuChosen(id) };
+  const handlers = { commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, setSpellCheckSetting, confirmDiscard, openFiles, readyToRestart, leaveCleanly, stepZoom, dropped, openRecent, setRecent, findInFolder, toggleFocus, menuChosen: (id: string) => menuChosen(id) };
   const actions = useRef(handlers);
   actions.current = handlers;
 
@@ -829,7 +842,13 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const mod = e.ctrlKey || e.metaKey;
+      // Focus mode: F11, or Ctrl/Cmd+Shift+Enter (F11 belongs to the system on a Mac).
+      if (!e.altKey && ((e.key === "F11" && !mod && !e.shiftKey) || (e.key === "Enter" && mod && e.shiftKey))) {
+        e.preventDefault();
+        return actions.current.toggleFocus();
+      }
+      if (!mod || e.altKey) return;
       const key = e.key.toLowerCase();
       const view = !e.shiftKey && ({ "1": "editor", "2": "split", "3": "preview", "4": "rich" } as Record<string, ViewMode>)[e.key];
       if (view) {
@@ -876,6 +895,7 @@ export default function App() {
     else if (id === "zoom-in" || id === "zoom-out" || id === "zoom-reset") stepZoom(id === "zoom-in" ? 1 : id === "zoom-out" ? -1 : 0);
     else if (id === "find-in-folder") findInFolder();
     else if (id === "settings") setSettingsOpen(true);
+    else if (id === "focus") toggleFocus();
     else if (id === "autosave") void setAutosave(!autosaveOn.current);
     else if (id === "spellcheck") void setSpellCheckSetting(!spellCheckOn.current);
     else if (id === "quit") void getCurrentWindow().close(); // asks about unsaved tabs, like the window's own Close
@@ -939,6 +959,8 @@ export default function App() {
               ["rich", "Rich", "Ctrl+4"],
             ] as const
           ).map(([mode, label, keys]) => item(`view:${mode}`, label, keys, { checked: viewMode === mode, radio: true })),
+          sep,
+          { ...item("focus", "Focus Mode"), shortcut: isMac ? "⌘⇧↩" : "F11", checked: focus },
           sep,
           item("zoom-in", "Zoom In", "Ctrl+="),
           item("zoom-out", "Zoom Out", "Ctrl+-"),
@@ -1107,13 +1129,21 @@ export default function App() {
     if (isTauri()) void getCurrentWindow().setTitle(`${dirty ? "● " : ""}${name} — Marklet`);
   }, [name, dirty]);
 
+  // In focus mode there is one column of text: Split shows its editor half only.
+  const layout: ViewMode = focus && viewMode === "split" ? "editor" : viewMode;
+
   const resizeSplit = (clientX: number) => {
     const box = panes.current?.getBoundingClientRect();
     if (box && box.width > 0) setSplit(clamp((clientX - box.left) / box.width, 0.2, 0.8));
   };
 
   return (
-    <div className="app">
+    <div className={`app${focus ? " focus" : ""}`}>
+      {focus && (
+        <div className="focus-hint" role="status">
+          Focus mode. Press {isMac ? "⌘⇧↩" : "F11"} to leave.
+        </div>
+      )}
       <Toolbar
         menu={appMenu}
         title={name}
@@ -1159,8 +1189,8 @@ export default function App() {
           <section
             className="pane pane-editor"
             style={{
-              display: viewMode === "preview" ? "none" : undefined,
-              flex: viewMode === "split" ? `0 0 ${split * 100}%` : "1 1 0",
+              display: layout === "preview" ? "none" : undefined,
+              flex: layout === "split" ? `0 0 ${split * 100}%` : "1 1 0",
             }}
           >
             <Editor
@@ -1176,13 +1206,13 @@ export default function App() {
               onPasteImages={(files) => void exclusive(() => pasteImages(files), true)}
             />
           </section>
-          {viewMode === "split" && <Splitter label="Resize editor and preview" onDrag={resizeSplit} />}
+          {layout === "split" && <Splitter label="Resize editor and preview" onDrag={resizeSplit} />}
           <Preview
             ref={preview}
             source={source}
             baseDir={dirOf(doc.path)}
             docId={activeId.current}
-            hidden={viewMode === "editor" || viewMode === "rich"}
+            hidden={layout === "editor" || layout === "rich"}
             onRendered={() => scrollSync.current?.afterRender()}
             onOpenFile={(path) => void exclusive(() => openPath(path))}
           />

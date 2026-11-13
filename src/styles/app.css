@@ -1104,3 +1104,82 @@ body.resizing * {
     border: 1px solid CanvasText;
   }
 }
+
+/*
+ * Focus mode (View > Focus Mode): only the text, in one centered column.
+ * The toolbar stays reachable: it fades in when the pointer or the keyboard
+ * reaches the top of the window.
+ */
+
+.app.focus .tabstrip,
+.app.focus .sidebar,
+.app.focus .body > .splitter,
+.app.focus .statusbar,
+.app.focus::before {
+  display: none;
+}
+
+.app.focus .toolbar {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 3;
+  background: var(--bar);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.app.focus .toolbar:hover,
+.app.focus .toolbar:focus-within {
+  opacity: 1;
+}
+
+.app.focus .panes {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.app.focus .cm-gutters {
+  display: none;
+}
+
+.app.focus .cm-editor:not(.cm-rich) .cm-content {
+  max-width: var(--text-width, 820px);
+  margin: 0 auto;
+}
+
+.focus-hint {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 4;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--bar);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 8px 24px -8px rgb(0 0 0 / 50%);
+  color: var(--muted);
+  font-size: 12px;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: focus-hint 3.2s forwards;
+}
+
+@keyframes focus-hint {
+  0% {
+    opacity: 0;
+  }
+  10%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media print {
+  .focus-hint {
+    display: none !important;
+  }
+}

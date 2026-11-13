@@ -74,8 +74,11 @@ const focusClass = EditorView.editorAttributes.of(() => ({ class: enabled ? "cm-
 const focusTheme = EditorView.theme({
   "&.cm-focus .cm-line": { opacity: "0.3", transition: "opacity 0.2s" },
   "&.cm-focus .cm-line.cm-focus-lit": { opacity: "1" },
+  // Drawn blocks in the Rich view (tables, diagrams, formulas) dim too, until one is being edited.
+  "&.cm-focus .cm-rich-block": { opacity: "0.3", transition: "opacity 0.2s" },
+  "&.cm-focus .cm-rich-block:focus-within": { opacity: "1" },
   // Room to bring the first and last lines to the middle.
-  "&.cm-focus .cm-content": { paddingTop: "40vh", paddingBottom: "50vh" },
+  "&.cm-focus .cm-scroller .cm-content": { paddingTop: "40vh", paddingBottom: "50vh" },
 });
 
 export const focusMode = [dimming, focusClass, focusTheme];
