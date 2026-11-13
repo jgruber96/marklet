@@ -2,6 +2,13 @@
 
 What changed in each version of Marklet. Installed copies from 0.2.0 on update themselves.
 
+## Unreleased
+
+- **Command palette:** Ctrl+T jumps to any note by a few letters of its name; Ctrl+Shift+P (or `>` in the box) finds any command.
+- **Focus mode** (F11, or Cmd+Shift+Enter on a Mac): full screen with only the text; everything but the paragraph being written is dimmed, and the cursor line stays in the middle.
+- **Smart editing:** brackets, quotes and backticks close themselves; typing `*`, `_` or `~` over a selection wraps it; pasting a web address over a selection makes a link.
+- **Welcome note:** a short tour opens on the first launch, and is always under Settings › Welcome Note.
+
 ## 0.6.0 (2026-11-13)
 
 - **Accessibility:** the editor, tabs, outline, file tree and task boxes are named for screen readers; tabs work from the keyboard (Left / Right, Enter, Delete); text on the glow and the document title in the light theme are easier to read; animations stop when the system asks for reduced motion; current items are outlined in Windows high-contrast themes.

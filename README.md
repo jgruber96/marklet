@@ -11,6 +11,10 @@ A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Taur
 - **Live preview** beside the editor, updated as you type, with scroll kept in sync both ways
 - **Rich view**: edit with the Markdown symbols hidden (headings, bold, links, bullets, task boxes, images, tables, math and diagrams shown as they will read); the source comes back where the cursor is, tables are edited cell by cell in place, Ctrl+click follows a link, and the file stays plain Markdown
 - **Folder workspace**: a tree of every Markdown file with new, rename and delete, which follows changes made outside the app
+- **Command palette**: Ctrl+T jumps to any note by a few letters of its name, and Ctrl+Shift+P finds any command
+- **Focus mode** (F11): full screen with only your text, the current paragraph lit and kept in the middle
+- **Smart editing**: lists and tasks continue on Enter, brackets and quotes pair up, typing `**` over a selection wraps it, and pasting a web address over a selection makes a link
+- **Welcome note**: a short tour on first launch, and any time from Settings › Welcome Note
 - **Search in folder**: a search box above the file tree lists every matching line in the folder's notes; click one to jump to it
 - **Drag and drop**: drop a note to open it, a folder to browse it, or an image onto the editor to add it
 - **Open Recent** in the File menu, and **zoom** for the editor and preview text
@@ -129,6 +133,8 @@ Ctrl on Windows, Cmd on macOS.
 | Tab strip (when focused) | Left / Right to move, Enter to show, Delete to close |
 | Export as HTML / PDF | Ctrl+Shift+E / Ctrl+P |
 | Editor only / Split / Preview only / Rich | Ctrl+1 / Ctrl+2 / Ctrl+3 / Ctrl+4 |
+| Go to note / command palette | Ctrl+T / Ctrl+Shift+P |
+| Focus mode | F11 (Cmd+Shift+Enter on macOS) |
 | Menu (File, Edit, View, Settings) | F10 |
 | Settings | Ctrl+, |
 | Find in folder | Ctrl+Shift+F |
@@ -164,6 +170,7 @@ Run on macOS 13+ (Apple Silicon) with the first signed build (November 2026); re
 - [x] 8. Image paste: pasted images saved beside the document in `assets/` and linked with a relative path
 - [x] 9. Spell check: the web view's checker on prose only, with a Settings toggle
 - [x] 10. Auto-update: signed updates from GitHub Releases, checked at startup and from the Settings menu
+- [x] 23. Command palette and quick open, focus mode, smart editing, and a welcome note on first launch
 - [x] 22. Release safety net: a smoke test of the running app and wider unit tests, both required before a release is published
 - [x] 21. Accessibility pass: automated audit (axe) clean in both themes and all accents apart from one false alarm on the editor's scroll area; named controls and landmarks, keyboard-operable tabs, readable contrast on the glow, reduced-motion and high-contrast support
 - [x] 20. macOS: signed and notarized Apple Silicon builds from the release workflow, with auto-update; tested on a Mac

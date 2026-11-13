@@ -5,8 +5,9 @@
 //
 // Windows only (it talks to the app's WebView2 over its debugging port). The
 // app runs from source (`tauri dev`) under its own identifier, so it never
-// touches the settings, session or recovery files of an installed Marklet,
-// and it works on a scratch folder of notes in the temp directory.
+// touches the settings, session or recovery files of an installed Marklet
+// (and runs even while one is open), and it works on a scratch folder of
+// notes in the temp directory.
 
 import { chromium } from "playwright-core";
 import { execSync, spawn } from "node:child_process";
@@ -197,7 +198,8 @@ async function main() {
   await page.waitForSelector(".cm-content", { timeout: 120000 });
   await page.waitForTimeout(2500);
   check("the window draws its own title bar", (await page.locator(".toolbar.titlebar .win-buttons button").count()) === 3);
-  check("a fresh profile starts with one Untitled tab", JSON.stringify((await app.tabs()).map((t) => t.name)) === '["Untitled.md"]', await app.tabs());
+  check("a fresh profile opens the welcome note, as a saved tab", JSON.stringify(await app.tabs()) === '[{"name":"Welcome.md","front":true,"unsaved":false}]', await app.tabs());
+  check("the welcome note is rendered", (await page.locator(".pane-preview h1").textContent()) === "Welcome to Marklet");
 
   console.log("\nOpen, edit, save");
   await app.drop([notes, notePath]);
@@ -215,6 +217,32 @@ async function main() {
   check("Ctrl+S writes the file", read().includes("End. Typed by smoke."), read());
   check("line endings are kept (LF)", !read().includes("\r"));
   check("saving clears the unsaved mark", (await app.tabs()).find((t) => t.front)?.unsaved === false);
+
+  console.log("\nSmart editing");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("- one");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("two");
+  check("Enter continues a list", (await app.line("- two")) === "- two", await app.line("two"));
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("(x");
+  check("an empty item ends the list, and brackets close themselves", (await app.line("(x")) === "(x)", await app.line("(x"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" plain");
+  await page.locator(".cm-line", { hasText: "(x) plain" }).dblclick({ position: { x: 60, y: 8 } });
+  const word = await page.evaluate(() => getSelection().toString());
+  await page.keyboard.type("*");
+  await page.keyboard.type("*");
+  check("typing ** over a selection makes it bold", word === "plain" && (await app.line("(x)")) === "(x) **plain**", [word, await app.line("(x)")]);
+  await page.evaluate(() => {
+    const data = new DataTransfer();
+    data.setData("text/plain", "https://example.com/page");
+    document.querySelector(".cm-content").dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  check("pasting a web address over a selection makes a link", (await app.line("(x)")) === "(x) **[plain](https://example.com/page)**", await app.line("(x)"));
+  await save();
 
   console.log("\nRich view and tables");
   await app.menu("View", "Rich");
@@ -265,6 +293,39 @@ async function main() {
   check("F10 opens the menu on its first item", (await page.evaluate(() => document.querySelector(".menu-item.active .menu-label")?.textContent)) === "File");
   await page.keyboard.press("Escape");
   check("Esc closes the menu", (await page.locator(".menu").count()) === 0);
+
+  console.log("\nFocus mode and the command palette");
+  await page.keyboard.press("F11");
+  await page.waitForTimeout(1200);
+  const focused = await page.evaluate(() => ({
+    on: document.querySelector(".app").classList.contains("focus"),
+    sidebar: getComputedStyle(document.querySelector(".sidebar")).display,
+    tabs: getComputedStyle(document.querySelector(".tabstrip")).display,
+    lit: document.querySelectorAll(".cm-focus-lit").length,
+    dim: document.querySelectorAll(".cm-line:not(.cm-focus-lit)").length,
+  }));
+  check("F11 hides everything but the text", focused.on && focused.sidebar === "none" && focused.tabs === "none", focused);
+  check("and lights only the paragraph being written", focused.lit >= 1 && focused.dim >= 1, focused);
+  await page.keyboard.press("F11");
+  await page.waitForTimeout(1200);
+  check("F11 again brings the window back", await page.evaluate(() => !document.querySelector(".app").classList.contains("focus") && getComputedStyle(document.querySelector(".sidebar")).display !== "none"));
+  await page.keyboard.press("Control+t");
+  await page.waitForSelector(".palette");
+  await page.keyboard.type("oth");
+  await page.waitForTimeout(200);
+  check("Ctrl+T finds a note from a few letters", (await page.locator(".palette-item.active .palette-label").textContent()) === "Other.md");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(700);
+  check("and Enter opens it", (await app.frontTab()) === "Other.md" && (await page.locator(".palette").count()) === 0, await app.frontTab());
+  await page.keyboard.press("Control+Shift+P");
+  await page.waitForSelector(".palette");
+  await page.keyboard.type("light");
+  await page.waitForTimeout(200);
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(400);
+  check("Ctrl+Shift+P runs a command by name", (await page.evaluate(() => document.documentElement.dataset.theme)) === "light");
+  await page.locator(".tab", { hasText: "Note.md" }).click();
+  await page.waitForTimeout(400);
 
   console.log("\nSearch in folder, images, export");
   await page.keyboard.press("Control+Shift+F");

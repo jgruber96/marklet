@@ -14,6 +14,7 @@ import type { SearchHit } from "./lib/sidebar/FolderSearch";
 import { setSpellCheck } from "./lib/editor/spellcheck";
 import { configureRich, setRich } from "./lib/editor/rich";
 import { setFocusMode } from "./lib/editor/focus";
+import { welcomeNote } from "./lib/welcome";
 import { openSearchPanel } from "@codemirror/search";
 import { checkForUpdate } from "./lib/update";
 import { Sidebar } from "./lib/sidebar/Sidebar";
@@ -40,6 +41,8 @@ import {
   saveSpellCheck,
   loadTheme,
   isViewMode,
+  loadWelcomed,
+  saveWelcomed,
   ACCENTS,
   ACCENT_LABELS,
   DEFAULT_LOOK,
@@ -303,6 +306,19 @@ export default function App() {
   };
 
   const newTab = () => addTab(untitledDoc(nextUntitledName()), "", { replacePristine: false });
+
+  const WELCOME = "Welcome.md";
+  /**
+   * Shows the welcome note: a tour in a tab of its own. It counts as saved
+   * (closing it asks nothing) until it is edited, when it becomes an ordinary
+   * unsaved note.
+   */
+  const showWelcome = () => {
+    const existing = tabs.current.find((t) => !t.doc.path && t.doc.untitledName === WELCOME && !t.dirty);
+    if (existing) return show(existing.id);
+    const text = welcomeNote(isMac);
+    addTab({ ...untitledDoc(WELCOME), savedText: text }, text);
+  };
 
   const setRecent = (files: string[]) => {
     recent.current = files;
@@ -903,6 +919,7 @@ export default function App() {
     else if (id === "find-in-folder") findInFolder();
     else if (id === "settings") setSettingsOpen(true);
     else if (id === "focus") toggleFocus();
+    else if (id === "welcome") showWelcome();
     else if (id === "goto") setPalette("");
     else if (id === "palette") setPalette(">");
     else if (id === "autosave") void setAutosave(!autosaveOn.current);
@@ -1001,6 +1018,7 @@ export default function App() {
           item("autosave", "Autosave", undefined, { checked: autosave }),
           item("spellcheck", "Spell Check", undefined, { checked: spellCheckOn.current }),
           sep,
+          item("welcome", "Welcome Note"),
           item("check-updates", "Check for Updates…"),
         ],
       },
@@ -1134,11 +1152,14 @@ export default function App() {
         }
       }
       const front = session.files[session.active];
-      if (opened.length === 0) addTab(untitledDoc(), "");
+      // The very first launch (nothing to restore, never welcomed) opens the tour; after that, a blank note.
+      if (opened.length === 0 && !session.workspace && !(await loadWelcomed())) showWelcome();
+      else if (opened.length === 0) addTab(untitledDoc(), "");
       else show((opened.find((t) => front && samePath(t.doc.path!, front)) ?? opened[opened.length - 1]).id);
       // A file the app was launched to open (double-click) comes to the front.
       if (isTauri()) await openFiles(await invoke<string[]>("take_launch_files"));
       await restoreLeftBehind();
+      void saveWelcomed();
     });
     // Look for a new version once the window has settled (installed builds only).
     if (!import.meta.env.DEV) {

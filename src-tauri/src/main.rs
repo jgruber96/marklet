@@ -14,6 +14,10 @@ use tauri::Manager;
 /// under the new identifier, copy its settings (theme, accent, autosave, last
 /// session) across. Runs before the front end opens the store.
 fn carry_over_settings(app: &tauri::AppHandle) {
+    // Only the real app inherits them: a test profile (another identifier) must start empty.
+    if app.config().identifier != "us.darkstardev.marklet" {
+        return;
+    }
     let Ok(dir) = app.path().app_data_dir() else { return };
     let Some(old) = dir.parent().map(|p| p.join("us.darkstardev.novamd").join("settings.json")) else { return };
     let new = dir.join("settings.json");

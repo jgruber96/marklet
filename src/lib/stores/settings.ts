@@ -245,3 +245,13 @@ export async function loadLook(): Promise<Look> {
 export async function saveLook(look: Look): Promise<void> {
   if (isTauri()) await (await settingsStore()).set("look", look);
 }
+
+/** Whether this installation has shown the welcome note (first launch only). */
+export async function loadWelcomed(): Promise<boolean> {
+  if (!isTauri()) return true;
+  return (await (await settingsStore()).get("welcomed")) === true;
+}
+
+export async function saveWelcomed(): Promise<void> {
+  if (isTauri()) await (await settingsStore()).set("welcomed", true);
+}

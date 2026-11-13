@@ -116,6 +116,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .item(&autosave)
         .item(&spellcheck)
         .separator()
+        .item(&item("welcome", "Welcome Note", None)?)
         .item(&item("check-updates", "Check for Updates…", None)?)
         .build()?;
 
