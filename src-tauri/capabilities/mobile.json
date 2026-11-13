@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile",
+  "description": "Permissions for the main window on iOS: no window controls, updater or restart",
+  "platforms": ["iOS", "android"],
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "store:default",
+    "opener:default",
+    "clipboard-manager:allow-write-text",
+    "dialog:default"
+  ]
+}

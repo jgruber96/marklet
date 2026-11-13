@@ -1,6 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { load, type Store } from "@tauri-apps/plugin-store";
+import { isDesktop } from "../platform";
 
 export type ThemeSetting = "system" | "light" | "dark";
 export const isThemeSetting = (v: unknown): v is ThemeSetting => v === "system" || v === "light" || v === "dark";
@@ -23,7 +24,7 @@ export function applyTheme(theme: ThemeSetting): void {
   } catch {
     // Cache only; the store still has it.
   }
-  if (isTauri()) void getCurrentWindow().setTheme(theme === "system" ? null : theme);
+  if (isTauri() && isDesktop) void getCurrentWindow().setTheme(theme === "system" ? null : theme);
 }
 
 /** Synchronous best guess for first paint. */
@@ -99,7 +100,7 @@ export async function saveSpellCheck(on: boolean): Promise<void> {
 
 /** Ticks or unticks a native check menu item, such as Settings › Autosave. */
 export async function setMenuChecked(id: string, checked: boolean): Promise<void> {
-  if (isTauri()) await invoke("set_menu_checked", { id, checked });
+  if (isTauri() && isDesktop) await invoke("set_menu_checked", { id, checked });
 }
 
 /** Accent presets; the values live in theme.css. The default is stored as "blue" (the first version's default) and shown as Aurora. */
@@ -142,7 +143,7 @@ export async function saveAccent(accent: AccentSetting): Promise<void> {
 
 /** Ticks one item of a radio-style menu group such as `accent:*`. */
 export async function checkMenuGroup(group: string, value: string): Promise<void> {
-  if (isTauri()) await invoke("check_menu_group", { group, value });
+  if (isTauri() && isDesktop) await invoke("check_menu_group", { group, value });
 }
 
 /** Text size steps for the editor and preview (View › Zoom In / Zoom Out). */
@@ -175,7 +176,7 @@ export async function loadRecent(): Promise<string[]> {
 /** Stores the list and refills the Open Recent menu. */
 export async function saveRecent(files: string[]): Promise<void> {
   if (!isTauri()) return;
-  await invoke("set_recent_menu", { files });
+  if (isDesktop) await invoke("set_recent_menu", { files });
   await (await settingsStore()).set("recent", files);
 }
 

@@ -14,10 +14,9 @@ import { katexStandaloneCss } from "../preview/math";
 import { findHeadings } from "../sidebar/headings";
 import { dirOf, joinPath } from "../paths";
 import type { AccentSetting, ThemeSetting } from "../stores/settings";
+import { isDesktop, isMacOS } from "../platform";
 
 export type ExportKind = "html" | "pdf";
-
-const isMac = navigator.userAgent.includes("Mac");
 
 /** Save dialog for an export, defaulting to the document's folder and name. */
 export async function pickExportPath(kind: ExportKind, docPath: string | null, name: string): Promise<string | null> {
@@ -124,8 +123,8 @@ export async function writeHtml(path: string, html: string): Promise<void> {
   await invoke("write_file", { path, text: html, lineEnding: "\n", bom: false });
 }
 
-/** PDF needs no path on macOS: the print dialog's PDF button saves it. */
-export const pdfNeedsPath = !isMac;
+/** PDF needs no path on macOS (the print dialog's PDF button saves it) or iOS (the share sheet will). */
+export const pdfNeedsPath = isDesktop && !isMacOS;
 
 /**
  * Prints the preview (styles/print.css hides the rest of the window). Windows

@@ -1,12 +1,14 @@
 //! Files the OS asks Marklet to open: double-clicked `.md` files (command-line
-//! arguments on Windows, open events on macOS), including when the app is
-//! already running.
+//! arguments on Windows, open events on macOS and iOS), including when the app
+//! is already running.
 
+#[cfg(desktop)]
 use std::path::Path;
 use std::sync::Mutex;
 
 use tauri::{AppHandle, Emitter, Manager};
 
+#[cfg(desktop)]
 use crate::fs::is_markdown;
 
 /// Files waiting for the front end, and whether it has started listening.
@@ -14,6 +16,7 @@ use crate::fs::is_markdown;
 pub struct LaunchFiles(Mutex<(Vec<String>, bool)>);
 
 /// Markdown files among command-line arguments (the first is the program).
+#[cfg(desktop)]
 pub fn files_from_args(args: impl IntoIterator<Item = String>) -> Vec<String> {
     args.into_iter()
         .skip(1)
@@ -46,6 +49,7 @@ pub fn take_launch_files(state: tauri::State<LaunchFiles>) -> Vec<String> {
 
 /// A second launch (double-clicking another file) forwards its files here and
 /// brings the existing window forward.
+#[cfg(desktop)]
 pub fn on_second_instance(app: &AppHandle, args: Vec<String>, _cwd: String) {
     open_files(app, files_from_args(args));
     if let Some(window) = app.get_webview_window("main") {
