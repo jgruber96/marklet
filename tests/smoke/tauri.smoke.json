@@ -1,1 +1,17 @@
-{ "identifier": "us.darkstardev.marklet.smoke" }
+{
+  "identifier": "us.darkstardev.marklet.smoke",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Marklet",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 760,
+        "minHeight": 480,
+        "decorations": false,
+        "additionalBrowserArgs": "--remote-debugging-port=9444 --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection"
+      }
+    ]
+  }
+}

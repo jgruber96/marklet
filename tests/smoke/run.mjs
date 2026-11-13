@@ -77,7 +77,8 @@ async function startApp() {
     cwd: root,
     shell: true,
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: "--remote-debugging-port=9444" },
+    // The web view's debugging port is asked for in tauri.smoke.json (the window's additionalBrowserArgs).
+    env: process.env,
   });
   let log = "";
   devProcess.stdout.on("data", (d) => (log += d));
@@ -110,7 +111,8 @@ async function startApp() {
     };
     tryPs("app and web view processes", "Get-Process marklet,msedgewebview2 -ErrorAction SilentlyContinue | Select-Object Name,Id,SessionId,MainWindowHandle | Format-Table -AutoSize | Out-String");
     tryPs("listening on 9444 or 1420", "Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -in 9444,1420 } | Select-Object LocalAddress,LocalPort,OwningProcess | Format-Table -AutoSize | Out-String");
-    tryPs("WebView2 runtime", "Get-ChildItem 'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients','HKCU:\\Software\\Microsoft\\EdgeUpdate\\Clients' -ErrorAction SilentlyContinue | ForEach-Object { $p = Get-ItemProperty $_.PSPath; $p.name + ' ' + $p.pv } | Out-String");
+    tryPs("WebView2 runtime", "(Get-Process msedgewebview2 -ErrorAction SilentlyContinue | Select-Object -First 1).Path");
+    tryPs("web view command line", "(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedgewebview2.exe' } | Select-Object -First 1).CommandLine");
     tryPs("this process session", "(Get-Process -Id $PID).SessionId");
     throw new Error(`The app's web view never became reachable (${runningSince ? "the app was running" : "the app never started"}; last error: ${lastError}).\n${facts.join("\n")}\n--- app output ---\n${log.slice(-1500)}`);
   }
