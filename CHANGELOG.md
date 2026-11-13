@@ -2,7 +2,7 @@
 
 What changed in each version of Marklet. Installed copies from 0.2.0 on update themselves.
 
-## Unreleased
+## 0.7.0 (2026-11-13)
 
 - **Command palette:** Ctrl+T jumps to any note by a few letters of its name; Ctrl+Shift+P (or `>` in the box) finds any command.
 - **Focus mode** (F11, or Cmd+Shift+Enter on a Mac): full screen with only the text; everything but the paragraph being written is dimmed, and the cursor line stays in the middle.
