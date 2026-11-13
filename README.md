@@ -36,6 +36,8 @@ A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Taur
 | --- | --- |
 | ![Split view in the light theme](docs/screenshots/split-light.png) | ![Rich view in the dark theme: Markdown symbols hidden, task boxes and code drawn in place](docs/screenshots/rich-dark.png) |
 
+![The app menu open on View, drawn in the app's own look](docs/screenshots/menu-dark.png)
+
 ## Prerequisites
 
 - Node.js 20+ and npm
@@ -174,6 +176,17 @@ Run on macOS 13+ (Apple Silicon) with the first signed build (November 2026); re
 - [x] 13. Aurora redesign: indigo surfaces, a three-color glow, pop colors for Markdown structure and icons, rounded tabs and an icon toolbar
 - [x] 12. Find and replace: a search bar above the editor, from Ctrl/Cmd+F or the Edit menu
 - [x] 11. Rich view: a fourth view mode that hides Markdown symbols away from the cursor and draws images, bullets, task boxes, tables, math and diagrams in place, with Ctrl/Cmd+click to follow links; raw HTML stays as source there
+
+## Privacy
+
+Marklet works on files on your computer and has no account, analytics or telemetry. It contacts the internet in two cases only:
+
+- **Update checks.** At startup, and when you choose Check for Updates, it asks GitHub (`github.com/jgruber96/marklet`) for the latest release, and downloads the update from there if you choose to install it. GitHub sees your IP address, as it would for any download. Nothing about you or your notes is sent.
+- **Content your notes point to.** A note that shows an image from a web address loads it from that address, and a link you click opens in your browser.
+
+Settings, the list of recent files and recovery copies of unsaved work are stored on your computer only, in the app's data folder.
+
+See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
 
 ## License
 

@@ -13,7 +13,8 @@
 # app (tests/smoke/run.mjs) pass.
 #
 # Run it by hand (Actions > Release > Run workflow) for a test build: the
-# installers are attached to the run as artifacts, and nothing is published.
+# installers are attached to the run as artifacts, the publish job rehearses
+# everything but the release itself, and nothing is published.
 #
 # Repository secrets:
 #   TAURI_SIGNING_PRIVATE_KEY   the update signing key. Required: installed
@@ -48,9 +49,9 @@ jobs:
             os: macos-latest # Apple Silicon
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -136,7 +137,7 @@ jobs:
           fi
           ls -l out
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: marklet-${{ matrix.platform }}
           path: out/
@@ -147,8 +148,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -163,18 +164,18 @@ jobs:
 
   publish:
     needs: [build, smoke]
-    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # The checkout keeps only the tagged commit; fetch the tag itself for its message.
-      - run: git fetch --force origin "refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}"
+      - if: startsWith(github.ref, 'refs/tags/')
+        run: git fetch --force origin "refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: out
           merge-multiple: true
@@ -183,15 +184,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
           notes=""
-          if [ "$(git cat-file -t "$GITHUB_REF_NAME")" = "tag" ]; then
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$(git cat-file -t "$GITHUB_REF_NAME")" = "tag" ]; then
             notes=$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")
           fi
           node scripts/latest-json.mjs "$notes" --dir out
           files=(out/*.exe out/*.msi out/*.dmg out/*.app.tar.gz installers/latest.json)
           ls -l "${files[@]}"
-          if [ -n "$notes" ]; then
+          cat installers/latest.json
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            echo "A test build: everything above is what a release would attach. Nothing was published."
+          elif [ -n "$notes" ]; then
             gh release create "$GITHUB_REF_NAME" "${files[@]}" --title "Marklet $version" --notes "$notes"
           else
             gh release create "$GITHUB_REF_NAME" "${files[@]}" --title "Marklet $version" --generate-notes

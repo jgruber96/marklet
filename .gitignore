@@ -7,3 +7,7 @@ src-tauri/.cargo/config.toml
 *.log
 .DS_Store
 installers/
+# installers downloaded or copied into the repo folder
+/*.msi
+/*.exe
+/*.dmg
