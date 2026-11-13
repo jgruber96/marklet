@@ -1,5 +1,6 @@
-# Checks every push and pull request on Windows and macOS: types, front-end
-# tests, production build, and the Rust tests.
+# Checks every push and pull request: types, front-end tests, production
+# build and the Rust tests on Windows and macOS, and a smoke test of the
+# running app on Windows.
 name: CI
 
 on:
@@ -38,3 +39,22 @@ jobs:
         run: npm test
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  # Starts the real app on Windows and drives it through its main features (tests/smoke/run.mjs).
+  smoke:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: smoke
+      - run: npm ci
+      - name: Smoke test
+        run: npm run smoke

@@ -1,7 +1,7 @@
 // Writes installers/latest.json, the file installed copies of Marklet read to
 // find an update: one entry per platform whose signed update file is found.
 //
-//   node scripts/latest-json.mjs ["Release notes shown in the update prompt"] [--dir <folder>]
+//   node scripts/latest-json.mjs ["Release notes shown in the update prompt"] [--dir <folder>] [--out <file>]
 //
 // With --dir (the release workflow), the update files and their .sig files
 // are read from that folder, under the names the release attaches them as.
@@ -16,9 +16,14 @@ const { version, productName } = JSON.parse(readFileSync(join(root, "src-tauri",
 const repo = "jgruber96/marklet";
 
 const args = process.argv.slice(2);
-const dirFlag = args.indexOf("--dir");
-const dir = dirFlag >= 0 ? args[dirFlag + 1] : null;
-const notes = args.filter((_, i) => i !== dirFlag && i !== dirFlag + 1)[0] ?? "";
+/** Takes `--name value` out of the arguments. */
+const flag = (name) => {
+  const i = args.indexOf(name);
+  return i >= 0 ? args.splice(i, 2)[1] : null;
+};
+const dir = flag("--dir");
+const outFile = flag("--out");
+const notes = args[0] ?? "";
 
 /**
  * Each platform: the file installed copies download (as attached to the
@@ -55,7 +60,7 @@ if (Object.keys(entries).length === 0) {
 }
 
 const latest = { version, notes, pub_date: new Date().toISOString(), platforms: entries };
-mkdirSync(join(root, "installers"), { recursive: true });
-const out = join(root, "installers", "latest.json");
+const out = outFile ?? join(root, "installers", "latest.json");
+mkdirSync(dirname(out), { recursive: true });
 writeFileSync(out, JSON.stringify(latest, null, 2) + "\n");
 console.log(`Wrote ${out} for ${productName} ${version}: ${Object.keys(entries).join(", ")}`);

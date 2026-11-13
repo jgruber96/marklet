@@ -50,6 +50,15 @@ npm install
 npm run tauri dev
 ```
 
+## Tests
+
+```bash
+npm test          # unit tests: paths, outline, tables, rendering and sanitizing, links, the update feed
+npm run smoke     # Windows: starts the real app and drives it through its main features
+```
+
+The smoke test (`tests/smoke/run.mjs`) runs the app from source under its own identifier, so it never touches an installed Marklet's settings or files. It opens a scratch folder, edits and saves, edits a table in the Rich view, finds and replaces, uses the menus and Settings, searches the folder, drops an image, and kills the app to check that unsaved work is offered back. GitHub runs both on every push, and a release is not published unless they pass.
+
 ## Build installers
 
 ```bash
@@ -153,6 +162,7 @@ Run on macOS 13+ (Apple Silicon) with the first signed build (November 2026); re
 - [x] 8. Image paste: pasted images saved beside the document in `assets/` and linked with a relative path
 - [x] 9. Spell check: the web view's checker on prose only, with a Settings toggle
 - [x] 10. Auto-update: signed updates from GitHub Releases, checked at startup and from the Settings menu
+- [x] 22. Release safety net: a smoke test of the running app and wider unit tests, both required before a release is published
 - [x] 21. Accessibility pass: automated audit (axe) clean in both themes and all accents apart from one false alarm on the editor's scroll area; named controls and landmarks, keyboard-operable tabs, readable contrast on the glow, reduced-motion and high-contrast support
 - [x] 20. macOS: signed and notarized Apple Silicon builds from the release workflow, with auto-update; tested on a Mac
 - [x] 19. Custom title bar and new icon: on Windows the window has no native frame; the toolbar carries the icon, a menu button, the title and the window buttons

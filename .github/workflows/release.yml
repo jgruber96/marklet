@@ -9,6 +9,9 @@
 # and src-tauri/Cargo.toml. The tag's message becomes the release notes and
 # the text of the update prompt (GitHub's generated notes if it has none).
 #
+# Nothing is published unless both builds and the smoke test of the running
+# app (tests/smoke/run.mjs) pass.
+#
 # Run it by hand (Actions > Release > Run workflow) for a test build: the
 # installers are attached to the run as artifacts, and nothing is published.
 #
@@ -139,8 +142,27 @@ jobs:
           path: out/
           if-no-files-found: error
 
+  # Starts the real app on Windows and drives it through its main features (tests/smoke/run.mjs).
+  smoke:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: smoke
+      - run: npm ci
+      - name: Smoke test
+        run: npm run smoke
+
   publish:
-    needs: build
+    needs: [build, smoke]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:

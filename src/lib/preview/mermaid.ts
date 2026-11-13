@@ -53,7 +53,12 @@ function request(code: string): void {
 function startWorker(): void {
   worker = track(
     work()
-      .catch((err) => console.error("Could not render diagrams", err))
+      .catch((err) => {
+        // Mermaid itself could not start. Drop what was waiting, or the worker would restart
+        // forever; the next edit asks again.
+        console.error("Could not render diagrams", err);
+        queue.clear();
+      })
       .then(() => {
         worker = null;
         if (queue.size) startWorker();
@@ -63,7 +68,7 @@ function startWorker(): void {
 
 async function work(): Promise<void> {
   const { default: mermaid } = await import("mermaid");
-  await document.fonts.ready; // labels are measured in the interface font
+  await document.fonts?.ready; // labels are measured in the interface font
   const fontFamily = getComputedStyle(document.documentElement).getPropertyValue("--font-ui").trim() || "sans-serif";
 
   while (queue.size) {
