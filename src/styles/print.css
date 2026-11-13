@@ -24,11 +24,17 @@
     --link: #0b7fb0;
     --code-text: #c2255c;
     --marker: #7048e8;
+    --glow-text: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--glow-1) 55%, var(--glow-ink)),
+      color-mix(in srgb, var(--glow-2) 55%, var(--glow-ink)) 55%,
+      color-mix(in srgb, var(--glow-3) 55%, var(--glow-ink))
+    );
 
     --tok-keyword: #d6336c;
     --tok-string: #0b7285;
     --tok-function: #7048e8;
-    --tok-comment: #8a86a3;
+    --tok-comment: #6f6a8c;
     --tok-number: #d9480f;
   }
 

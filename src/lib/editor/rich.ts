@@ -516,7 +516,7 @@ const richTheme = EditorView.theme({
   "&.cm-rich .cm-rich-h5": { fontSize: "0.875em" },
   "&.cm-rich .cm-rich-h6": { fontSize: "0.85em", color: "var(--muted)" },
   // The document title shines, as in the preview.
-  "&.cm-rich .cm-rich-h1 span": { background: "var(--glow)", backgroundClip: "text", WebkitBackgroundClip: "text", color: "transparent" },
+  "&.cm-rich .cm-rich-h1 span": { background: "var(--glow-text)", backgroundClip: "text", WebkitBackgroundClip: "text", color: "transparent" },
 
   "&.cm-rich .cm-line.cm-rich-quote": {
     marginLeft: "32px",

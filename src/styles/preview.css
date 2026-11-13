@@ -33,7 +33,7 @@
   max-width: 100%;
   font-size: 2em;
   font-weight: 700;
-  background: var(--glow);
+  background: var(--glow-text);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

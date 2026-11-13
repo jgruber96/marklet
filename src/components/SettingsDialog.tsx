@@ -75,12 +75,12 @@ export function SettingsDialog({ values, onClose, ...on }: SettingsDialogProps) 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div ref={dialog} className="modal settings" role="dialog" aria-modal="true" aria-labelledby="settings-title" onKeyDown={onKeyDown}>
-        <header className="modal-head">
+        <div className="modal-head">
           <h1 id="settings-title">Settings</h1>
           <button className="icon-btn" aria-label="Close" title="Close (Esc)" onClick={onClose}>
             <X size={16} />
           </button>
-        </header>
+        </div>
 
         <div className="modal-body">
           <Group title="Appearance">

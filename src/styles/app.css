@@ -167,15 +167,14 @@ button {
   transition: color 0.12s;
 }
 
-.segmented button:hover {
+.segmented button:hover:not(.active) {
   color: var(--text);
 }
 
 .segmented button.active {
   background: var(--glow);
-  color: #fff;
+  color: var(--on-glow);
   font-weight: 600;
-  text-shadow: 0 1px 1px rgb(0 0 0 / 25%);
   box-shadow: 0 2px 10px -2px color-mix(in srgb, var(--glow-2) 70%, transparent);
 }
 
@@ -240,6 +239,23 @@ button {
   height: 2px;
   border-radius: 2px;
   background: var(--glow);
+}
+
+.tab-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: stretch;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: default;
+}
+
+.tab-main:focus-visible {
+  outline-offset: 3px;
+  border-radius: 4px;
 }
 
 .tab-name {
@@ -1049,5 +1065,42 @@ body.resizing * {
 @media print {
   .menu-layer {
     display: none !important;
+  }
+}
+
+/* People who ask their system for less motion get none of the fades and slides. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * Windows high-contrast themes replace the app's colors with the system's and
+ * drop backgrounds, which is how the current tab, view, row and menu item are
+ * shown here. Outline them instead.
+ */
+@media (forced-colors: active) {
+  .tab.active,
+  .segmented button.active,
+  .tree-row.active,
+  .outline-item.active,
+  .menu-item.active,
+  .search-hit:hover,
+  .swatch.active,
+  .switch.on {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  .menu,
+  .modal,
+  .panes {
+    border: 1px solid CanvasText;
   }
 }

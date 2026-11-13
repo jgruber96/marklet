@@ -73,7 +73,7 @@ md.renderer.rules.fence = (tokens, idx, _options, rawEnv) => {
     `<div class="code-block"${lineAttr(token)}>` +
     `<div class="code-head"><span class="code-lang">${label}</span>` +
     `<button type="button" class="code-copy">Copy</button></div>` +
-    `<pre><code>${body}</code></pre></div>\n`
+    `<pre tabindex="0"><code>${body}</code></pre></div>\n`
   );
 };
 
@@ -130,7 +130,12 @@ export function renderInlineFragment(source: string, baseDir: string | null): st
 
 function render(source: string, baseDir: string | null, fragment: boolean, inline = false): string {
   const env: RenderEnv = { baseDir, slots: [], slotKey: crypto.randomUUID(), diagrams: 0, fragment };
-  const html = DOMPurify.sanitize(inline ? md.renderInline(source, env) : md.render(source, env), {
+  // Task boxes are read-only pictures of the source; give each a name for screen readers.
+  const raw = (inline ? md.renderInline(source, env) : md.render(source, env)).replaceAll(
+    'class="task-list-item-checkbox"',
+    'class="task-list-item-checkbox" aria-label="Task"',
+  );
+  const html = DOMPurify.sanitize(raw, {
     ALLOWED_URI_REGEXP,
     FORBID_TAGS: ["style", "form"],
     FORBID_ATTR: ["style"],

@@ -43,11 +43,11 @@ export function Outline({ source, topLine, onScroll, onJump }: OutlineProps) {
   if (headings.length === 0) return <div className="side-empty">Headings in the current file appear here.</div>;
 
   return (
-    <div className="outline" ref={list} role="list">
+    <div className="outline" ref={list}>
       {headings.map((h, i) => (
         <button
           key={`${h.line}:${h.text}`}
-          role="listitem"
+          aria-current={i === active ? "location" : undefined}
           className={`outline-item${i === active ? " active" : ""}`}
           style={{ paddingLeft: 14 + (h.level - minLevel) * INDENT }}
           title={h.text}

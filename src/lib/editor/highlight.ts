@@ -25,7 +25,7 @@ const style = HighlightStyle.define([
   { tag: t.quote, color: "var(--muted)", fontStyle: "italic" },
   { tag: t.contentSeparator, color: "var(--muted)" },
   // Syntax characters: #, **, _, [](), backticks, fences, >, list markers.
-  { tag: [t.processingInstruction, t.labelName], color: "var(--marker)", opacity: "0.7" },
+  { tag: [t.processingInstruction, t.labelName], color: "var(--marker)", opacity: "0.9" },
 
   // Code inside fenced blocks
   {

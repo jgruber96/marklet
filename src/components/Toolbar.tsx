@@ -136,7 +136,7 @@ export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpe
   }, []);
 
   return (
-    <div className={`toolbar${ownTitleBar ? " titlebar" : ""}`} {...drag}>
+    <header className={`toolbar${ownTitleBar ? " titlebar" : ""}`} {...drag}>
       {ownTitleBar && (
         <>
           <img className="app-icon" src={appIcon} alt="" draggable={false} {...drag} />
@@ -209,6 +209,6 @@ export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpe
       </button>
 
       {ownTitleBar && <WindowButtons />}
-    </div>
+    </header>
   );
 }

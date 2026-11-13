@@ -31,6 +31,16 @@
   --glow-2: #a66bff;
   --glow-3: #4cc9f0;
   --glow: linear-gradient(90deg, var(--glow-1), var(--glow-2) 55%, var(--glow-3));
+  /* The glow as a text color (the document title). On a light page the stops are deepened to stay readable. */
+  --glow-ink: #1a0f3a;
+  --glow-text: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--glow-1) 55%, var(--glow-ink)),
+    color-mix(in srgb, var(--glow-2) 55%, var(--glow-ink)) 55%,
+    color-mix(in srgb, var(--glow-3) 55%, var(--glow-ink))
+  );
+  /* Text on top of the glow (the active view button): dark, since the glow is bright in every preset. */
+  --on-glow: #16141f;
   /* A faint wash of the glow behind the window chrome. */
   --wash-strength: 13%;
 
@@ -50,7 +60,7 @@
   --tok-keyword: #d6336c;
   --tok-string: #0b7285;
   --tok-function: #7048e8;
-  --tok-comment: #8a86a3;
+  --tok-comment: #6f6a8c;
   --tok-number: #d9480f;
 
   --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -71,6 +81,7 @@
     --code-bg: #161522;
     --current-line: #252438;
     --wash-strength: 20%;
+    --glow-text: var(--glow);
 
     --h1: #ff7ab6;
     --h2: #b79cff;
@@ -86,7 +97,7 @@
     --tok-keyword: #ff7ab6;
     --tok-string: #7ee0d2;
     --tok-function: #b79cff;
-    --tok-comment: #7a7896;
+    --tok-comment: #8683a3;
     --tok-number: #ffb86b;
   }
 }
@@ -104,6 +115,7 @@
   --code-bg: #161522;
   --current-line: #252438;
   --wash-strength: 20%;
+  --glow-text: var(--glow);
 
   --h1: #ff7ab6;
   --h2: #b79cff;
@@ -119,7 +131,7 @@
   --tok-keyword: #ff7ab6;
   --tok-string: #7ee0d2;
   --tok-function: #b79cff;
-  --tok-comment: #7a7896;
+  --tok-comment: #8683a3;
   --tok-number: #ffb86b;
 }
 
@@ -133,7 +145,7 @@
 .swatch[data-accent="purple"] {
   --accent-light: #6d4aff;
   --accent-dark: #a99bff;
-  --glow-1: #6d5efc;
+  --glow-1: #8f84ff;
   --glow-2: #a66bff;
   --glow-3: #e58bff;
 }

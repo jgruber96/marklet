@@ -60,6 +60,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(prop
         history(),
         drawSelection(),
         EditorView.lineWrapping,
+        EditorView.contentAttributes.of({ "aria-label": "Markdown editor" }),
         markdown({ base: markdownLanguage, codeLanguages: editorCodeLanguages }),
         markdownHighlighting,
         spellCheck,

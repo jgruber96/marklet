@@ -23,7 +23,7 @@ export const editorTheme = EditorView.theme({
     color: "var(--muted)",
     border: "none",
   },
-  ".cm-lineNumbers .cm-gutterElement": { padding: "0 4px 0 16px", opacity: "0.7" },
+  ".cm-lineNumbers .cm-gutterElement": { padding: "0 4px 0 16px", opacity: "0.85" },
   ".cm-activeLine": { backgroundColor: "var(--current-line)" },
   ".cm-code-block": { backgroundColor: "var(--code-bg)" },
   ".cm-code-block.cm-activeLine": { backgroundColor: "var(--current-line)" },

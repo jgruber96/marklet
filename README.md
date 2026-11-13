@@ -115,6 +115,7 @@ Ctrl on Windows, Cmd on macOS.
 | New / Open / Open Folder | Ctrl+N / Ctrl+O / Ctrl+Shift+O |
 | Save / Save As | Ctrl+S / Ctrl+Shift+S |
 | Close tab / next tab / previous tab | Ctrl+W / Ctrl+Tab / Ctrl+Shift+Tab |
+| Tab strip (when focused) | Left / Right to move, Enter to show, Delete to close |
 | Export as HTML / PDF | Ctrl+Shift+E / Ctrl+P |
 | Editor only / Split / Preview only / Rich | Ctrl+1 / Ctrl+2 / Ctrl+3 / Ctrl+4 |
 | Menu (File, Edit, View, Settings) | F10 |
@@ -152,6 +153,7 @@ Run on macOS 13+ (Apple Silicon) with the first signed build (November 2026); re
 - [x] 8. Image paste: pasted images saved beside the document in `assets/` and linked with a relative path
 - [x] 9. Spell check: the web view's checker on prose only, with a Settings toggle
 - [x] 10. Auto-update: signed updates from GitHub Releases, checked at startup and from the Settings menu
+- [x] 21. Accessibility pass: automated audit (axe) clean in both themes and all accents apart from one false alarm on the editor's scroll area; named controls and landmarks, keyboard-operable tabs, readable contrast on the glow, reduced-motion and high-contrast support
 - [x] 20. macOS: signed and notarized Apple Silicon builds from the release workflow, with auto-update; tested on a Mac
 - [x] 19. Custom title bar and new icon: on Windows the window has no native frame; the toolbar carries the icon, a menu button, the title and the window buttons
 - [x] 18. Rich view finish: tables edited in place (Tab between cells, add and remove rows and columns), and tables, diagrams and formulas drawn inside lists and quotes

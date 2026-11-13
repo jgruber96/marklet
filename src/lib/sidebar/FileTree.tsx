@@ -164,15 +164,17 @@ export function FileTree(props: FileTreeProps) {
     });
 
   return (
-    <div className="tree" role="tree" aria-label="Files" ref={tree} onContextMenu={(e) => showMenu(e, null)}>
+    <div className="tree" ref={tree} onContextMenu={(e) => showMenu(e, null)}>
       <div className="tree-root" title={root}>
         <span className="tree-name">{baseName(root)}</span>
         <button className="icon-btn" onClick={() => startNew(root)} aria-label="New file" title="New file">
           <FilePlus size={14} />
         </button>
       </div>
-      {newRow(root, 0)}
-      {renderNodes(nodes, 0)}
+      <div role="tree" aria-label={`Files in ${baseName(root)}`}>
+        {newRow(root, 0)}
+        {renderNodes(nodes, 0)}
+      </div>
       {nodes.length === 0 && editing === null && <div className="side-empty">No Markdown files in this folder yet.</div>}
     </div>
   );
