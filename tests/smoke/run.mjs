@@ -180,7 +180,10 @@ async function main() {
   const errors = [];
   const watch = (p) => {
     p.on("pageerror", (e) => errors.push(String(e)));
-    p.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+    // A failed request is reported with its address below, in place of the console's bare "Failed to load resource".
+    p.on("console", (m) => m.type() === "error" && !m.text().startsWith("Failed to load resource") && errors.push(m.text()));
+    p.on("response", (r) => r.status() >= 400 && errors.push(`${r.status()} ${r.url()}`));
+    p.on("requestfailed", (r) => errors.push(`failed ${r.url()} (${r.failure()?.errorText ?? "?"})`));
   };
   watch(page);
   let app = driver(page);
