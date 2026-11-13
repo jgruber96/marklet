@@ -82,18 +82,38 @@ async function startApp() {
   let log = "";
   devProcess.stdout.on("data", (d) => (log += d));
   devProcess.stderr.on("data", (d) => (log += d));
-  // The first run compiles the app, which can take several minutes.
-  const deadline = Date.now() + 25 * 60 * 1000;
+  // The first run compiles the app, which can take several minutes; once it is running, the web view is up within seconds.
+  const compileDeadline = Date.now() + 25 * 60 * 1000;
+  let runningSince = 0;
   let browser = null;
-  while (!browser && Date.now() < deadline) {
+  let lastError = "";
+  while (!browser) {
     if (devProcess.exitCode !== null) throw new Error(`The app did not start:\n${log.slice(-2000)}`);
+    if (!runningSince && appRunning()) runningSince = Date.now();
+    if (runningSince ? Date.now() - runningSince > 3 * 60 * 1000 : Date.now() > compileDeadline) break;
     try {
-      browser = await chromium.connectOverCDP(CDP);
-    } catch {
+      browser = await chromium.connectOverCDP(CDP, { timeout: 15000 });
+    } catch (err) {
+      lastError = String(err).split("\n")[0];
       await sleep(2000);
     }
   }
-  if (!browser) throw new Error(`The app's web view never became reachable:\n${log.slice(-2000)}`);
+  if (!browser) {
+    // Say what the machine looks like, so a failure on another computer can be understood from its log.
+    const facts = [];
+    const tryPs = (label, command) => {
+      try {
+        facts.push(`${label}:\n${ps(command) || "(nothing)"}`);
+      } catch (err) {
+        facts.push(`${label}: failed (${String(err).split("\n")[0]})`);
+      }
+    };
+    tryPs("app and web view processes", "Get-Process marklet,msedgewebview2 -ErrorAction SilentlyContinue | Select-Object Name,Id,SessionId,MainWindowHandle | Format-Table -AutoSize | Out-String");
+    tryPs("listening on 9444 or 1420", "Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -in 9444,1420 } | Select-Object LocalAddress,LocalPort,OwningProcess | Format-Table -AutoSize | Out-String");
+    tryPs("WebView2 runtime", "Get-ChildItem 'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients','HKCU:\\Software\\Microsoft\\EdgeUpdate\\Clients' -ErrorAction SilentlyContinue | ForEach-Object { $p = Get-ItemProperty $_.PSPath; $p.name + ' ' + $p.pv } | Out-String");
+    tryPs("this process session", "(Get-Process -Id $PID).SessionId");
+    throw new Error(`The app's web view never became reachable (${runningSince ? "the app was running" : "the app never started"}; last error: ${lastError}).\n${facts.join("\n")}\n--- app output ---\n${log.slice(-1500)}`);
+  }
   const page = browser.contexts()[0].pages()[0];
   return { browser, page };
 }
