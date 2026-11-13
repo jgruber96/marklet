@@ -79,3 +79,23 @@ describe("tables edited in the Rich view", () => {
     expect(cleanCell("  a | b\n c \\| d ")).toBe("a \\| b c \\| d");
   });
 });
+
+import { fuzzyFilter, fuzzyMatch } from "../src/lib/fuzzy";
+
+describe("fuzzy matching for the command palette", () => {
+  it("matches letters in order, ignoring case and spaces", () => {
+    expect(fuzzyMatch("rdm", "Roadmap.md")?.positions).toEqual([0, 3, 4]);
+    expect(fuzzyMatch("zoom in", "View: Zoom In")).not.toBeNull();
+    expect(fuzzyMatch("xyz", "Roadmap.md")).toBeNull();
+    expect(fuzzyMatch("", "anything")).toEqual({ score: 0, positions: [] });
+  });
+  it("marks a plain substring as one run", () => {
+    expect(fuzzyMatch("dark", "Theme: Dark")?.positions).toEqual([7, 8, 9, 10]);
+  });
+  it("ranks whole-word and early matches first, and keeps order on ties", () => {
+    const names = ["Meeting notes.md", "Notes.md", "Keynote outline.md", "Ideas.md"];
+    expect(fuzzyFilter("notes", names, (n) => n).map((r) => r.item)).toEqual(["Notes.md", "Meeting notes.md"]);
+    expect(fuzzyFilter("note", names, (n) => n).map((r) => r.item)).toEqual(["Notes.md", "Meeting notes.md", "Keynote outline.md"]);
+    expect(fuzzyFilter("", names, (n) => n).map((r) => r.item)).toEqual(names);
+  });
+});

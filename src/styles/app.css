@@ -1183,3 +1183,170 @@ body.resizing * {
     display: none !important;
   }
 }
+
+/* Command palette (components/CommandPalette.tsx) */
+
+.palette-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 11vh 24px 24px;
+  background: color-mix(in srgb, #0b0a14 40%, transparent);
+}
+
+.palette {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(600px, 100%);
+  max-height: min(460px, 100%);
+  overflow: hidden;
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--glow-1) 8%, transparent), color-mix(in srgb, var(--glow-3) 6%, transparent)),
+    var(--bg);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 24px 60px -12px rgb(0 0 0 / 55%);
+  animation: menu-in 0.1s ease-out;
+}
+
+.palette::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--glow);
+}
+
+.palette-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  padding: 16px 18px 12px;
+  color: var(--muted);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.palette-box input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--text);
+  font: 15px var(--font-ui);
+  user-select: text;
+}
+
+.palette-box input::placeholder {
+  color: var(--muted);
+}
+
+.palette-list {
+  flex: 1;
+  min-height: 0;
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.palette-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px 0 6px;
+  border-radius: 8px;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.palette-item.active {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--glow-1) 26%, transparent), color-mix(in srgb, var(--glow-2) 26%, transparent) 60%, color-mix(in srgb, var(--glow-3) 22%, transparent));
+}
+
+.palette-item.active::before {
+  content: "";
+  position: absolute;
+  inset: 7px auto 7px 0;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--glow-1), var(--glow-2));
+}
+
+.palette-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  color: var(--accent);
+}
+
+.palette-label {
+  flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette-label mark {
+  background: none;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.palette-group {
+  color: var(--muted);
+}
+
+.palette-detail {
+  flex: 1;
+  min-width: 0;
+  margin-left: 8px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+}
+
+.palette-hint {
+  flex: none;
+  margin-left: auto;
+  padding-left: 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.palette-empty {
+  padding: 18px 12px;
+  color: var(--muted);
+}
+
+.palette-foot {
+  display: flex;
+  gap: 18px;
+  flex: none;
+  padding: 8px 18px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+@media print {
+  .palette-layer {
+    display: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .palette-item.active {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}

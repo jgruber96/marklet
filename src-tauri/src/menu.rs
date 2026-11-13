@@ -60,6 +60,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let mut file = SubmenuBuilder::new(app, "File")
         .item(&item("new", "New", Some("CmdOrCtrl+N"))?)
         .item(&item("open", "Open…", Some("CmdOrCtrl+O"))?)
+        .item(&item("goto", "Go to Note…", Some("CmdOrCtrl+T"))?)
         .item(&recent)
         .item(&item("open-folder", "Open Folder…", Some("CmdOrCtrl+Shift+O"))?)
         .item(&item("close-folder", "Close Folder", None)?)
@@ -120,6 +121,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 
     let find = item("find", "Find and Replace…", Some("CmdOrCtrl+F"))?;
     let find_in_folder = item("find-in-folder", "Find in Folder…", Some("CmdOrCtrl+Shift+F"))?;
+    let palette = item("palette", "Command Palette…", Some("CmdOrCtrl+Shift+P"))?;
     let menu = Menu::new(app)?;
     if cfg!(target_os = "macos") {
         // macOS: settings live in the app menu, and an Edit menu is required
@@ -148,10 +150,12 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             .separator()
             .item(&find)
             .item(&find_in_folder)
+            .separator()
+            .item(&palette)
             .build()?;
         menu.append_items(&[&app_menu, &file, &edit, &view])?;
     } else {
-        let edit = SubmenuBuilder::new(app, "Edit").item(&find).item(&find_in_folder).build()?;
+        let edit = SubmenuBuilder::new(app, "Edit").item(&find).item(&find_in_folder).separator().item(&palette).build()?;
         menu.append_items(&[&file, &edit, &view, &settings])?;
     }
     Ok(menu)

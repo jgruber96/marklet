@@ -89,6 +89,7 @@ import { StatusBar } from "./components/StatusBar";
 import { Splitter } from "./components/Splitter";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { PopupMenuHost, type MenuItem } from "./components/PopupMenu";
+import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
 
 const isMac = navigator.userAgent.includes("Mac");
 
@@ -142,6 +143,8 @@ export default function App() {
   const [zoom, setZoomState] = useState(1);
   const [searchFocus, setSearchFocus] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** The command palette, when open: the text it starts with ("" for notes, ">" for commands). */
+  const [palette, setPalette] = useState<string | null>(null);
   /** Focus mode: the window shows only the text, full screen (View › Focus Mode). */
   const [focus, setFocusState] = useState(false);
   const focusOn = useRef(false);
@@ -864,6 +867,10 @@ export default function App() {
         e.preventDefault();
         return setSettingsOpen((open) => !open);
       }
+      if ((key === "p" && e.shiftKey) || (key === "t" && !e.shiftKey)) {
+        e.preventDefault();
+        return setPalette(key === "p" ? ">" : "");
+      }
       if (key === "f" && e.shiftKey) {
         e.preventDefault();
         return actions.current.findInFolder();
@@ -896,6 +903,8 @@ export default function App() {
     else if (id === "find-in-folder") findInFolder();
     else if (id === "settings") setSettingsOpen(true);
     else if (id === "focus") toggleFocus();
+    else if (id === "goto") setPalette("");
+    else if (id === "palette") setPalette(">");
     else if (id === "autosave") void setAutosave(!autosaveOn.current);
     else if (id === "spellcheck") void setSpellCheckSetting(!spellCheckOn.current);
     else if (id === "quit") void getCurrentWindow().close(); // asks about unsaved tabs, like the window's own Close
@@ -919,6 +928,7 @@ export default function App() {
         submenu: [
           item("new", "New", "Ctrl+N"),
           item("open", "Open…", "Ctrl+O"),
+          item("goto", "Go to Note…", "Ctrl+T"),
           {
             label: "Open Recent",
             submenu: files.length
@@ -946,7 +956,12 @@ export default function App() {
       },
       {
         label: "Edit",
-        submenu: [item("find", "Find and Replace…", "Ctrl+F"), item("find-in-folder", "Find in Folder…", "Ctrl+Shift+F")],
+        submenu: [
+          item("find", "Find and Replace…", "Ctrl+F"),
+          item("find-in-folder", "Find in Folder…", "Ctrl+Shift+F"),
+          sep,
+          item("palette", "Command Palette…", "Ctrl+Shift+P"),
+        ],
       },
       {
         label: "View",
@@ -990,6 +1005,56 @@ export default function App() {
         ],
       },
     ];
+  };
+
+  /** Notes the palette can jump to: recent ones first, then open tabs, then the rest of the folder. */
+  const paletteNotes = (): PaletteItem[] => {
+    const seen = new Set<string>();
+    const out: PaletteItem[] = [];
+    const add = (path: string) => {
+      const key = path.replace(/\\/g, "/").toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      const dir = dirOf(path) ?? "";
+      // Inside the open folder, show where in it; elsewhere, the whole folder path.
+      const where = root.current && isInside(path, root.current) ? dir.slice(root.current.length).replace(/^[\\/]/, "") : dir;
+      out.push({ id: path, label: baseName(path), detail: where, run: () => void exclusive(() => openPath(path)) });
+    };
+    recent.current.forEach(add);
+    tabs.current.forEach((t) => t.doc.path && add(t.doc.path));
+    const walk = (list: TreeNode[]) => list.forEach((node) => (node.children ? walk(node.children) : add(node.path)));
+    walk(nodes);
+    return out;
+  };
+
+  /** Every command: the app menu flattened ("Settings: Theme: Dark"), plus the formatting buttons. */
+  const paletteCommands = (): PaletteItem[] => {
+    const out: PaletteItem[] = [];
+    const walk = (items: MenuItem[], trail: string[]) => {
+      for (const entry of items) {
+        if ("separator" in entry || entry.disabled) continue;
+        if (entry.submenu) {
+          walk(entry.submenu, [...trail, entry.label]);
+          continue;
+        }
+        // Recent files are found as notes; only Clear Recent is a command.
+        if (trail[trail.length - 1] === "Open Recent" && entry.label !== "Clear Recent") continue;
+        const label = [...trail.slice(1), entry.label].join(": ").replace(/…$/, "");
+        out.push({ id: [...trail, entry.label].join("/"), label, detail: trail[0], hint: entry.shortcut, checked: entry.checked, run: () => entry.action?.() });
+      }
+    };
+    walk(appMenu(), []);
+    const key = (keys: string) => (isMac ? keys.replace("Ctrl+", "⌘") : keys);
+    const formats: [FormatKind, string, string?][] = [
+      ["bold", "Bold", "Ctrl+B"],
+      ["italic", "Italic", "Ctrl+I"],
+      ["heading", "Heading (cycles #, ##, ###)"],
+      ["link", "Link", "Ctrl+K"],
+      ["code", "Inline Code"],
+      ["bullet", "Bulleted List"],
+    ];
+    for (const [kind, label, keys] of formats) out.push({ id: `format/${kind}`, label, detail: "Format", hint: keys && key(keys), run: () => format(kind) });
+    return out;
   };
 
   // Native menu items arrive as a "menu" event carrying the item id.
@@ -1250,6 +1315,17 @@ export default function App() {
       )}
 
       <PopupMenuHost />
+      {palette !== null && (
+        <CommandPalette
+          initial={palette}
+          notes={paletteNotes()}
+          commands={paletteCommands()}
+          onClose={() => {
+            setPalette(null);
+            editor.current?.focus();
+          }}
+        />
+      )}
 
       <StatusBar doc={doc} dirty={dirty} autosave={autosave} {...cursor} words={words} zoom={zoom} />
     </div>
