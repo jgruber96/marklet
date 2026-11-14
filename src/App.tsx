@@ -17,6 +17,7 @@ import { setFocusMode } from "./lib/editor/focus";
 import { welcomeNote } from "./lib/welcome";
 import { openSearchPanel } from "@codemirror/search";
 import { checkForUpdate } from "./lib/update";
+import { appleKeys as isMac, isDesktop, isMobile } from "./lib/platform";
 import { Sidebar } from "./lib/sidebar/Sidebar";
 import {
   type Doc,
@@ -93,8 +94,6 @@ import { Splitter } from "./components/Splitter";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { PopupMenuHost, type MenuItem } from "./components/PopupMenu";
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
-
-const isMac = navigator.userAgent.includes("Mac");
 
 const SIDEBAR_MIN = 180;
 const SIDEBAR_MAX = 420;
@@ -695,7 +694,7 @@ export default function App() {
     focusOn.current = on;
     setFocusState(on);
     setFocusMode(on, editor.current?.view ?? null);
-    if (isTauri()) void getCurrentWindow().setFullscreen(on).catch(console.warn);
+    if (isTauri() && isDesktop) void getCurrentWindow().setFullscreen(on).catch(console.warn);
     editor.current?.focus();
   };
 
@@ -782,6 +781,8 @@ export default function App() {
       if (path) await openPath(path);
     },
     "open-folder": async () => {
+      // iOS: the workspace is always the app's Documents folder.
+      if (isMobile) return;
       const dir = await pickFolder();
       if (dir) await setWorkspace(dir);
     },
@@ -1082,12 +1083,14 @@ export default function App() {
     const unwatch = listen<string[]>("fs-change", ({ payload }) => actions.current.onFsChange(payload));
     // Files double-clicked in Explorer or Finder while the app is running.
     const unopen = listen<string[]>("open-files", ({ payload }) => void exclusive(() => actions.current.openFiles(payload), true));
-    // Files and folders dragged onto the window. Positions arrive in device pixels.
-    const undrop = getCurrentWebview().onDragDropEvent(({ payload }) => {
-      if (payload.type !== "drop") return;
-      const at = { x: payload.position.x / window.devicePixelRatio, y: payload.position.y / window.devicePixelRatio };
-      void exclusive(() => actions.current.dropped(payload.paths, at), true);
-    });
+    // Files and folders dragged onto the window (desktop). Positions arrive in device pixels.
+    const undrop = isDesktop
+      ? getCurrentWebview().onDragDropEvent(({ payload }) => {
+          if (payload.type !== "drop") return;
+          const at = { x: payload.position.x / window.devicePixelRatio, y: payload.position.y / window.devicePixelRatio };
+          void exclusive(() => actions.current.dropped(payload.paths, at), true);
+        })
+      : Promise.resolve(() => {});
     return () => {
       void undrop.then((fn) => fn());
       void unlisten.then((fn) => fn());
@@ -1141,7 +1144,9 @@ export default function App() {
     started.current = true;
     void exclusive(async () => {
       const session = await loadSession();
-      if (session.workspace) await setWorkspace(session.workspace, session.expanded);
+      // iOS: the workspace is always the app's Documents folder (its path can change between installs).
+      if (isMobile && isTauri()) await setWorkspace(await invoke<string>("mobile_workspace"), session.expanded);
+      else if (session.workspace) await setWorkspace(session.workspace, session.expanded);
       const opened: Tab[] = [];
       for (const path of session.files) {
         try {
@@ -1161,8 +1166,8 @@ export default function App() {
       await restoreLeftBehind();
       void saveWelcomed();
     });
-    // Look for a new version once the window has settled (installed builds only).
-    if (!import.meta.env.DEV) {
+    // Look for a new version once the window has settled (installed desktop builds only; the App Store updates iOS).
+    if (!import.meta.env.DEV && isDesktop) {
       window.setTimeout(() => void exclusive(() => checkForUpdate(false, () => actions.current.readyToRestart()), true), 3000);
     }
   }, []);
@@ -1212,7 +1217,7 @@ export default function App() {
   const dirty = active?.dirty ?? false;
   const name = docName(doc);
   useEffect(() => {
-    if (isTauri()) void getCurrentWindow().setTitle(`${dirty ? "● " : ""}${name} — Marklet`);
+    if (isTauri() && isDesktop) void getCurrentWindow().setTitle(`${dirty ? "● " : ""}${name} — Marklet`);
   }, [name, dirty]);
 
   // In focus mode there is one column of text: Split shows its editor half only.

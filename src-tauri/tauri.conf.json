@@ -59,6 +59,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "iOS": {
+      "minimumSystemVersion": "17.0",
+      "developmentTeam": "RQB64FV4A6"
+    },
     "fileAssociations": [
       {
         "ext": [

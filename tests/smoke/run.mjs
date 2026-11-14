@@ -117,7 +117,13 @@ async function startApp() {
     tryPs("this process session", "(Get-Process -Id $PID).SessionId");
     throw new Error(`The app's web view never became reachable (${runningSince ? "the app was running" : "the app never started"}; last error: ${lastError}).\n${facts.join("\n")}\n--- app output ---\n${log.slice(-1500)}`);
   }
-  const page = browser.contexts()[0].pages()[0];
+  // The debugging port can answer a moment before the web view has its page: wait for it.
+  let page = null;
+  for (const until = Date.now() + 60 * 1000; !page && Date.now() < until; ) {
+    page = browser.contexts()[0]?.pages()[0] ?? null;
+    if (!page) await sleep(500);
+  }
+  if (!page) throw new Error(`The app's web view had no page a minute after it became reachable.\n--- app output ---\n${log.slice(-1500)}`);
   return { browser, page };
 }
 

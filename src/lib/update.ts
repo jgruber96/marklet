@@ -2,6 +2,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { ask, message } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
+import { isMobile } from "./platform";
 
 /*
  * Updates come from the newest GitHub release: the app reads its latest.json
@@ -18,7 +19,8 @@ let checking = false;
  * app the chance to save open files; resolving false cancels the install.
  */
 export async function checkForUpdate(manual: boolean, beforeInstall: () => Promise<boolean>): Promise<void> {
-  if (!isTauri() || checking) return;
+  // iOS gets updates from the App Store.
+  if (!isTauri() || isMobile || checking) return;
   checking = true;
   try {
     const update = await check();

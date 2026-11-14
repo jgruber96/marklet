@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, FilePlus, FileText, Folder, FolderOpen } fro
 import type { TreeNode } from "../stores/workspace";
 import { baseName, samePath } from "../paths";
 import { focusRow, moveFocus, syncTabStop } from "./roving";
+import { isDesktop, isMacOS } from "../platform";
 
 export interface FileTreeActions {
   onOpenFile(path: string): void;
@@ -26,7 +27,7 @@ interface FileTreeProps extends FileTreeActions {
 /** An inline name box: a new file in `dir`, or a rename of `path`. */
 type Editing = { kind: "new"; dir: string } | { kind: "rename"; path: string };
 
-const revealLabel = navigator.userAgent.includes("Mac") ? "Reveal in Finder" : "Show in Explorer";
+const revealLabel = isMacOS ? "Reveal in Finder" : "Show in Explorer";
 const INDENT = 14;
 const ROW = '.tree-row[role="treeitem"]';
 
@@ -68,8 +69,8 @@ export function FileTree(props: FileTreeProps) {
             { label: "Delete", shortcut: "Del", action: () => props.onDelete(node) },
           ]
         : []),
-      { separator: true as const },
-      { label: revealLabel, action: () => props.onReveal(node?.path ?? root) },
+      // iOS has no Finder or Explorer to show the file in.
+      ...(isDesktop ? [{ separator: true as const }, { label: revealLabel, action: () => props.onReveal(node?.path ?? root) }] : []),
     ];
     // The keyboard's menu key reports no pointer position: open at the row instead.
     const box = (e.currentTarget as HTMLElement).getBoundingClientRect();

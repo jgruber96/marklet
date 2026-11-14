@@ -17,6 +17,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { showMenu, type MenuItem } from "./PopupMenu";
 import appIcon from "../assets/icon.svg";
+import { appleKeys, isDesktop, isMacOS } from "../lib/platform";
 import type { ViewMode } from "../lib/stores/settings";
 import type { ExportKind } from "../lib/export/export";
 import type { FormatKind } from "../lib/editor/format";
@@ -43,16 +44,15 @@ const viewModes: { mode: ViewMode; label: string }[] = [
   { mode: "rich", label: "Rich" },
 ];
 
-const isMac = navigator.userAgent.includes("Mac");
-const mod = isMac ? "⌘" : "Ctrl+";
+const mod = appleKeys ? "⌘" : "Ctrl+";
 
 /**
  * On Windows the app draws its own title bar: the window has no native frame,
  * and this toolbar is the top of the window. It carries the icon, the menu
  * button, the title and the window buttons, and its empty areas drag the
- * window. macOS keeps its own title bar and menu bar.
+ * window. macOS keeps its own title bar and menu bar; iOS has no window frame.
  */
-const ownTitleBar = isTauri() && !isMac;
+const ownTitleBar = isTauri() && isDesktop && !isMacOS;
 /** Marks an empty area of the bar as a handle for moving the window. */
 const drag = ownTitleBar ? { "data-tauri-drag-region": true } : {};
 
@@ -152,9 +152,12 @@ export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpe
       <button className="tb-btn icon pop-cyan" onClick={onOpen} aria-label="Open file" title={`Open file (${mod}O)`}>
         <FileText size={16} />
       </button>
-      <button className="tb-btn icon pop-amber" onClick={onOpenFolder} aria-label="Open folder" title={`Open folder (${mod}Shift+O)`}>
-        <FolderOpen size={16} />
-      </button>
+      {/* iOS: the workspace is always the app's Documents folder; there is no folder to pick. */}
+      {isDesktop && (
+        <button className="tb-btn icon pop-amber" onClick={onOpenFolder} aria-label="Open folder" title={`Open folder (${mod}Shift+O)`}>
+          <FolderOpen size={16} />
+        </button>
+      )}
 
       <div className="tb-sep" />
 

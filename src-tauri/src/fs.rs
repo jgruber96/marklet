@@ -147,9 +147,38 @@ pub fn rename_path(from: String, to: String) -> Result<(), String> {
 }
 
 /// Moves a file or folder to the Recycle Bin / Trash, so a delete can be undone there.
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn trash_path(path: String) -> Result<(), String> {
     trash::delete(&path).map_err(|e| format!("Could not move {path} to the trash: {e}"))
+}
+
+/// iOS has no system trash: a deleted file or folder moves into the app's own
+/// data folder (`trash/<time>/`), out of sight in the Files app but not gone.
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn trash_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    use tauri::Manager;
+    let source = Path::new(&path);
+    let name = source.file_name().ok_or_else(|| format!("Could not delete {path}"))?;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or_default();
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("trash").join(stamp.to_string());
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Could not delete {path}: {e}"))?;
+    std::fs::rename(source, dir.join(name)).map_err(|e| format!("Could not delete {path}: {e}"))
+}
+
+/// iOS: the workspace is the app's Documents folder, which the Files app shows
+/// under "On My iPhone/iPad › Marklet". Created on first use.
+#[cfg(mobile)]
+#[tauri::command]
+pub fn mobile_workspace(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri::Manager;
+    let dir = app.path().document_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(path_string(&dir))
 }
 
 /// Largest pasted image that is saved (before base64 encoding).

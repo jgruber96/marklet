@@ -87,9 +87,18 @@ pub async fn print_to_pdf(window: tauri::WebviewWindow, path: String) -> Result<
 
 /// macOS: WKWebView has no silent print-to-file here, so this opens the print
 /// dialog, whose PDF button saves the file.
-#[cfg(not(windows))]
+#[cfg(all(desktop, not(windows)))]
 #[tauri::command]
 pub async fn print_to_pdf(window: tauri::WebviewWindow, path: String) -> Result<(), String> {
     let _ = path;
     window.print().map_err(|e| e.to_string())
+}
+
+/// iOS: Tauri has no printing there. PDF export will come through WKWebView's
+/// createPDF and the share sheet (phase 5 of docs/IOS-BRIEF.md).
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn print_to_pdf(path: String) -> Result<(), String> {
+    let _ = path;
+    Err("PDF export isn't available on iPhone and iPad yet. Export to HTML works.".into())
 }
