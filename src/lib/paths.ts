@@ -37,6 +37,18 @@ export function isInside(path: string, dir: string): boolean {
 /** Re-roots `path` from under `from` to under `to` (after a folder rename). */
 export const reroot = (path: string, from: string, to: string) => to + path.slice(from.replace(/[\\/]+$/, "").length);
 
+/**
+ * iOS keeps an app's files under a folder whose name can change between installs
+ * (…/Application/<id>/Documents). Moves a saved path that pointed into an earlier
+ * Documents folder into `documents`; any other path comes back unchanged.
+ */
+export function intoDocuments(path: string, documents: string): string {
+  const marker = "/Documents/";
+  const at = path.indexOf(marker);
+  if (at < 0 || isInside(path, documents)) return path;
+  return documents.replace(/\/+$/, "") + path.slice(at + marker.length - 1);
+}
+
 export const isMarkdownPath = (path: string) => /\.(md|markdown)$/i.test(path);
 
 /** Adds `.md` when a typed file name has no extension at all. */

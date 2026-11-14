@@ -82,6 +82,8 @@ import {
   renamePath,
   trashPath,
   watchFolder,
+  documentsDir,
+  currentPath,
 } from "./lib/stores/workspace";
 import { loadSession, saveSession } from "./lib/tabs/session";
 import { leftBehind, removeRecovery, writeRecovery } from "./lib/tabs/recovery";
@@ -359,7 +361,14 @@ export default function App() {
       noteRecent(path);
       return true;
     } catch (err) {
-      await showError(err);
+      // iOS: a note outside Marklet's own folder (iCloud Drive, another app) can't be read in place yet.
+      const documents = await documentsDir();
+      if (documents && !isInside(path, documents)) {
+        await showError(
+          `Marklet can only open notes in its own folder for now. In the Files app, copy “${baseName(path)}” ` +
+            "into On My iPhone (or iPad) › Marklet, then open it from there.",
+        );
+      } else await showError(err);
       return false;
     }
   };
@@ -842,7 +851,7 @@ export default function App() {
     for (const path of paths) await openPath(path);
   };
 
-  const handlers = { commands, onFsChange, setTheme, setAccent, setViewMode, setAutosave, setSpellCheckSetting, confirmDiscard, openFiles, readyToRestart, leaveCleanly, stepZoom, dropped, openRecent, setRecent, findInFolder, toggleFocus, menuChosen: (id: string) => menuChosen(id) };
+  const handlers = { commands, onFsChange, autosaveAll, setTheme, setAccent, setViewMode, setAutosave, setSpellCheckSetting, confirmDiscard, openFiles, readyToRestart, leaveCleanly, stepZoom, dropped, openRecent, setRecent, findInFolder, toggleFocus, menuChosen: (id: string) => menuChosen(id) };
   const actions = useRef(handlers);
   actions.current = handlers;
 
@@ -1148,7 +1157,8 @@ export default function App() {
       setZoomState(value);
       editor.current?.view?.requestMeasure();
     });
-    void loadRecent().then((files) => {
+    void loadRecent().then(async (saved) => {
+      const files = await Promise.all(saved.map(currentPath));
       // Refill the menu; anything opened in the meantime stays on top.
       setRecent([...recent.current, ...files.filter((f) => !recent.current.some((r) => samePath(r, f)))].slice(0, RECENT_LIMIT));
     });
@@ -1166,11 +1176,13 @@ export default function App() {
     started.current = true;
     void exclusive(async () => {
       const session = await loadSession();
-      // iOS: the workspace is always the app's Documents folder (its path can change between installs).
-      if (isMobile && isTauri()) await setWorkspace(await invoke<string>("mobile_workspace"), session.expanded);
+      // iOS: the workspace is always the app's Documents folder, and saved paths follow it if it moved.
+      const documents = await documentsDir();
+      if (documents) await setWorkspace(documents, session.expanded);
       else if (session.workspace) await setWorkspace(session.workspace, session.expanded);
+      const files = await Promise.all(session.files.map(currentPath));
       const opened: Tab[] = [];
-      for (const path of session.files) {
+      for (const path of files) {
         try {
           const { doc, text } = await readDoc(path);
           opened.push(addTab(doc, text, { front: false }));
@@ -1178,7 +1190,7 @@ export default function App() {
           // Moved or deleted since last time: skip it.
         }
       }
-      const front = session.files[session.active];
+      const front = files[session.active];
       // The very first launch (nothing to restore, never welcomed) opens the tour; after that, a blank note.
       if (opened.length === 0 && !session.workspace && !(await loadWelcomed())) showWelcome();
       else if (opened.length === 0) addTab(untitledDoc(), "");
@@ -1204,6 +1216,24 @@ export default function App() {
       sync.destroy();
       scrollSync.current = null;
     };
+  }, []);
+
+  // iOS has no folder watcher, and may stop or close the app without warning while it is in the background.
+  // Going to the background: save now (autosave's usual pause could be cut short). Coming back: look again
+  // at the folder and the open notes, which may have changed in the Files app or another app meanwhile.
+  useEffect(() => {
+    if (!isMobile) return;
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        clearTimeout(autosaveTimer.current);
+        void exclusive(() => actions.current.autosaveAll(), true);
+        return;
+      }
+      const open = tabs.current.flatMap((t) => (t.doc.path ? [t.doc.path] : []));
+      actions.current.onFsChange(root.current ? [root.current, ...open] : open);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
   // Turned, folded or unfolded, or resized in Split View: the layout follows the room. Going between
