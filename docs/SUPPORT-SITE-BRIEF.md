@@ -253,7 +253,7 @@ Current screenshots (1280 × 800, taken from the running app) are in `docs/scree
 | `rich-dark.png` | Rich view: symbols hidden, task boxes and code drawn in place |
 | `menu-dark.png` | The app menu open on View |
 
-Mobile screenshots should come from the iOS app itself (on iOS there is no glow hairline along the top of the screen). Good additional desktop shots for the site: the welcome note in Rich view, the command palette, Focus mode, a table being edited, a Mermaid diagram, and the Settings window with the six accent swatches. These are Windows captures; the App Store needs Mac captures of the Mac build (§11).
+Mobile screenshots should come from the iOS app itself (on iOS there is no glow hairline along the top of the screen). Good additional desktop shots for the site: the welcome note in Rich view, the command palette, Focus mode, a table being edited, a Mermaid diagram, and the Settings window with the six accent swatches. The existing shots are Windows captures; App Store listings need captures from the platform being listed (§11).
 
 ## 9. Build and technical facts
 
