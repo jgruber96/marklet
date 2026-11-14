@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dirOf, isInside, isMarkdownPath, joinPath, reroot, samePath, withMarkdownExt } from "../src/lib/paths";
+import { dirOf, intoDocuments, isInside, isMarkdownPath, joinPath, reroot, samePath, withMarkdownExt } from "../src/lib/paths";
 import { findHeadings } from "../src/lib/sidebar/headings";
 import { countWords } from "../src/lib/stores/document";
 
@@ -25,6 +25,17 @@ describe("paths", () => {
     expect(isMarkdownPath("a.txt")).toBe(false);
     expect(withMarkdownExt("ideas")).toBe("ideas.md");
     expect(withMarkdownExt("ideas.txt")).toBe("ideas.txt");
+  });
+});
+
+describe("iOS paths after the app's folder moves", () => {
+  const now = "/private/var/mobile/Containers/Data/Application/NEW/Documents";
+  it("moves a note from an earlier Documents folder into today's", () => {
+    expect(intoDocuments("/private/var/mobile/Containers/Data/Application/OLD/Documents/Notes/a.md", now)).toBe(`${now}/Notes/a.md`);
+  });
+  it("leaves paths already in today's folder, and anything else, alone", () => {
+    expect(intoDocuments(`${now}/b.md`, now)).toBe(`${now}/b.md`);
+    expect(intoDocuments("C:\\Notes\\c.md", now)).toBe("C:\\Notes\\c.md");
   });
 });
 

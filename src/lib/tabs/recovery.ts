@@ -1,5 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { LineEnding } from "../stores/document";
+import { currentPath } from "../stores/workspace";
 
 /*
  * Recovery copies: while a tab has unsaved changes, its text is kept in a
@@ -56,7 +57,8 @@ export async function leftBehind(): Promise<LeftBehind> {
   for (const [, data] of files) {
     try {
       const copy: unknown = JSON.parse(data);
-      if (isCopy(copy)) copies.push(copy);
+      // iOS: the app's folder can have moved since (see intoDocuments).
+      if (isCopy(copy)) copies.push({ ...copy, path: copy.path && (await currentPath(copy.path)) });
     } catch {
       // A damaged copy is dropped with the rest.
     }

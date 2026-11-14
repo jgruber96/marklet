@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { message, open, save } from "@tauri-apps/plugin-dialog";
-import { baseName, joinPath } from "../paths";
+import { baseName, dirOf, joinPath, withMarkdownExt } from "../paths";
+import { isMobile } from "../platform";
 
 export type LineEnding = "\n" | "\r\n";
 
@@ -32,9 +33,30 @@ export async function pickFileToOpen(): Promise<string | null> {
   return typeof picked === "string" ? picked : null;
 }
 
-/** Save dialog; a new file starts out in `folder` (the workspace) when there is one. */
+/**
+ * Where a file goes on iOS, which has no save dialog: `name` in `dir`, or with " 2", " 3"… added
+ * when that is taken. The user renames it afterwards if they like (press and hold it in the sidebar).
+ */
+export async function freePath(dir: string, name: string): Promise<string> {
+  const dot = name.lastIndexOf(".");
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : "";
+  for (let n = 1; ; n++) {
+    const path = joinPath(dir, n === 1 ? name : `${stem} ${n}${ext}`);
+    if ((await invoke<string>("path_kind", { path })) === "none") return path;
+  }
+}
+
+/**
+ * Save dialog; a new file starts out in `folder` (the workspace) when there is one. iOS has no
+ * save dialog: a new note goes into Marklet's folder under its name, and Save As makes a copy beside it.
+ */
 export async function pickSavePath(doc: Doc, folder: string | null): Promise<string | null> {
   const name = docName(doc);
+  if (isMobile) {
+    const dir = dirOf(doc.path) ?? folder;
+    return dir ? freePath(dir, withMarkdownExt(name)) : null;
+  }
   return save({ defaultPath: !doc.path && folder ? joinPath(folder, name) : doc.path ?? name, filters: markdownFilter });
 }
 

@@ -1,6 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { ask, open } from "@tauri-apps/plugin-dialog";
-import { baseName } from "../paths";
+import { baseName, intoDocuments } from "../paths";
 import { isMacOS, isMobile } from "../platform";
 
 /** A Markdown file, or a folder that holds some, as listed by the Rust side. */
@@ -14,6 +14,20 @@ export interface TreeNode {
 export async function pickFolder(): Promise<string | null> {
   const picked = await open({ directory: true, multiple: false });
   return typeof picked === "string" ? picked : null;
+}
+
+let documents: Promise<string | null> | null = null;
+
+/** iOS: the app's Documents folder, which is the workspace and what the Files app shows. Null on desktop. */
+export function documentsDir(): Promise<string | null> {
+  documents ??= isMobile && isTauri() ? invoke<string>("mobile_workspace") : Promise.resolve(null);
+  return documents;
+}
+
+/** A path saved in an earlier run (open tabs, recent files, recovery copies), as it is now: see intoDocuments. */
+export async function currentPath(path: string): Promise<string> {
+  const docs = await documentsDir();
+  return docs ? intoDocuments(path, docs) : path;
 }
 
 export const listFolder = (root: string) => invoke<TreeNode[]>("list_folder", { root });
