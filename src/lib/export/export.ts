@@ -14,7 +14,9 @@ import { katexStandaloneCss } from "../preview/math";
 import { findHeadings } from "../sidebar/headings";
 import { dirOf, joinPath } from "../paths";
 import type { AccentSetting, ThemeSetting } from "../stores/settings";
-import { isDesktop, isMacOS } from "../platform";
+import { isDesktop, isMacOS, isMobile } from "../platform";
+import { freePath } from "../stores/document";
+import { documentsDir } from "../stores/workspace";
 
 export type ExportKind = "html" | "pdf";
 
@@ -23,6 +25,11 @@ export async function pickExportPath(kind: ExportKind, docPath: string | null, n
   const base = name.replace(/\.(md|markdown)$/i, "");
   const file = `${base}.${kind}`;
   const dir = dirOf(docPath);
+  // iOS has no save dialog: the export goes beside the note (or in Marklet's folder), under a free name.
+  if (isMobile) {
+    const folder = dir ?? (await documentsDir());
+    return folder ? freePath(folder, file) : null;
+  }
   return save({
     defaultPath: dir ? joinPath(dir, file) : file,
     filters: [kind === "html" ? { name: "HTML", extensions: ["html", "htm"] } : { name: "PDF", extensions: ["pdf"] }],

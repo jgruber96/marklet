@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { EditorView } from "@codemirror/view";
-import { ask } from "@tauri-apps/plugin-dialog";
+import { ask, message } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { EditorState, StateEffect } from "@codemirror/state";
 import { Editor, type EditorHandle } from "./lib/editor/Editor";
@@ -784,6 +784,8 @@ export default function App() {
         const path = await pickExportPath("html", tab.doc.path, name);
         if (!path) return;
         await writeHtml(path, await buildHtml(textOf(tab), dirOf(tab.doc.path), name, theme.current, accent.current));
+        // iOS: there was no save dialog, so say where it went.
+        if (isMobile) await message(`Saved “${baseName(path)}” in Marklet's folder. Open it from the Files app to share it.`, { title: "Marklet", kind: "info" });
       } else {
         const path = pdfNeedsPath ? await pickExportPath("pdf", tab.doc.path, name) : null;
         if (pdfNeedsPath && !path) return;
