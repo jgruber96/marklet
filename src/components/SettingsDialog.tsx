@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { getVersion } from "@tauri-apps/api/app";
 import { isTauri } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
+import { isMobile } from "../lib/platform";
 import {
   ACCENTS,
   ACCENT_LABELS,
@@ -140,10 +141,13 @@ export function SettingsDialog({ values, onClose, ...on }: SettingsDialogProps) 
           </Group>
 
           <Group title="About">
-            <Row label={`Marklet${version ? ` ${version}` : ""}`} hint="Updates are checked at startup">
-              <button className="btn" onClick={on.onCheckUpdates}>
-                Check for Updates
-              </button>
+            {/* iOS: the App Store updates the app. */}
+            <Row label={`Marklet${version ? ` ${version}` : ""}`} hint={isMobile ? undefined : "Updates are checked at startup"}>
+              {isMobile ? null : (
+                <button className="btn" onClick={on.onCheckUpdates}>
+                  Check for Updates
+                </button>
+              )}
             </Row>
           </Group>
         </div>

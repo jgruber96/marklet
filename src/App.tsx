@@ -95,6 +95,10 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { PopupMenuHost, type MenuItem } from "./components/PopupMenu";
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
 
+/** Narrower than this (iPad in portrait, iPhone), the sidebar slides over the page instead of sitting beside it. */
+const NARROW = 1000;
+const isNarrow = () => isMobile && window.innerWidth < NARROW;
+
 const SIDEBAR_MIN = 180;
 const SIDEBAR_MAX = 420;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -139,6 +143,9 @@ export default function App() {
   const autosaveTimer = useRef<number | undefined>(undefined);
   const scrollListeners = useRef(new Set<() => void>());
   const [sidebarWidth, setSidebarWidth] = useState(240);
+  /** iPad and iPhone: the sidebar button. On a narrow screen it starts hidden and slides over the page. */
+  const [narrow, setNarrow] = useState(isNarrow);
+  const [sidebarShown, setSidebarShown] = useState(() => !isNarrow());
   const [split, setSplit] = useState(0.5);
   const [viewMode, setViewModeState] = useState<ViewMode>("split");
   const [source, setSource] = useState("");
@@ -700,6 +707,7 @@ export default function App() {
 
   /** Puts the cursor in the sidebar's search box (not a file action: those hand focus back to the editor). */
   const findInFolder = () => {
+    setSidebarShown(true); // the search box is in the sidebar
     if (root.current) return setSearchFocus((n) => n + 1);
     // Nothing to search yet: pick a folder first, then the box is ready.
     void exclusive(async () => {
@@ -920,6 +928,7 @@ export default function App() {
     else if (id === "find-in-folder") findInFolder();
     else if (id === "settings") setSettingsOpen(true);
     else if (id === "focus") toggleFocus();
+    else if (id === "sidebar") setSidebarShown((shown) => !shown);
     else if (id === "welcome") showWelcome();
     else if (id === "goto") setPalette("");
     else if (id === "palette") setPalette(">");
@@ -958,8 +967,10 @@ export default function App() {
                 ]
               : [{ label: "No Recent Files", disabled: true }],
           },
-          item("open-folder", "Open Folder…", "Ctrl+Shift+O"),
-          item("close-folder", "Close Folder", undefined, { disabled: !root.current }),
+          // iOS: the workspace is always the app's Documents folder.
+          ...(isDesktop
+            ? [item("open-folder", "Open Folder…", "Ctrl+Shift+O"), item("close-folder", "Close Folder", undefined, { disabled: !root.current })]
+            : []),
           sep,
           item("save", "Save", "Ctrl+S"),
           item("save-as", "Save As…", "Ctrl+Shift+S"),
@@ -968,8 +979,8 @@ export default function App() {
           item("export-pdf", "Export as PDF…", "Ctrl+P"),
           sep,
           item("close-tab", "Close Tab", "Ctrl+W"),
-          sep,
-          item("quit", "Exit"),
+          // iOS apps are not quit from inside.
+          ...(isDesktop ? [sep, item("quit", "Exit")] : []),
         ],
       },
       {
@@ -993,6 +1004,7 @@ export default function App() {
             ] as const
           ).map(([mode, label, keys]) => item(`view:${mode}`, label, keys, { checked: viewMode === mode, radio: true })),
           sep,
+          ...(isMobile ? [item("sidebar", "Sidebar", undefined, { checked: sidebarShown })] : []),
           { ...item("focus", "Focus Mode"), shortcut: isMac ? "⌘⇧↩" : "F11", checked: focus },
           sep,
           item("zoom-in", "Zoom In", "Ctrl+="),
@@ -1020,7 +1032,8 @@ export default function App() {
           item("spellcheck", "Spell Check", undefined, { checked: spellCheckOn.current }),
           sep,
           item("welcome", "Welcome Note"),
-          item("check-updates", "Check for Updates…"),
+          // iOS: the App Store updates the app.
+          ...(isDesktop ? [item("check-updates", "Check for Updates…")] : []),
         ],
       },
     ];
@@ -1184,6 +1197,22 @@ export default function App() {
     };
   }, []);
 
+  // iPad turned between landscape and portrait: the sidebar sits beside the page or slides over it,
+  // and starts out shown or hidden to match.
+  useEffect(() => {
+    if (!isMobile) return;
+    let was = isNarrow();
+    const onResize = () => {
+      const now = isNarrow();
+      if (now === was) return;
+      was = now;
+      setNarrow(now);
+      setSidebarShown(!now);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   // Scroll sync only makes sense with both panes on screen.
   useEffect(() => {
     scrollSync.current?.setEnabled(viewMode === "split");
@@ -1246,6 +1275,8 @@ export default function App() {
         onOpenFolder={() => run("open-folder")}
         onFormat={format}
         onExport={(kind) => run(`export-${kind}`)}
+        sidebarShown={sidebarShown}
+        onToggleSidebar={() => setSidebarShown((shown) => !shown)}
       />
       <TabStrip
         tabs={tabs.current.map((t) => ({ id: t.id, name: docName(t.doc), title: t.doc.path ?? docName(t.doc), dirty: t.dirty }))}
@@ -1255,14 +1286,19 @@ export default function App() {
         onNew={() => run("new")}
       />
 
-      <main className="body">
+      <main className={`body${sidebarShown ? "" : " no-sidebar"}${narrow ? " sidebar-overlay" : ""}`}>
+        {narrow && sidebarShown && <div className="sidebar-scrim" onClick={() => setSidebarShown(false)} />}
         <Sidebar
           width={sidebarWidth}
           root={root.current}
           nodes={nodes}
           expanded={expanded.current}
           activePath={doc.path}
-          onOpenFile={(path) => void exclusive(() => openPath(path))}
+          onOpenFile={(path) => {
+            // Over the page, the sidebar gets out of the way once a note is picked.
+            if (narrow) setSidebarShown(false);
+            void exclusive(() => openPath(path));
+          }}
           onOpenFolder={() => run("open-folder")}
           onToggle={toggleFolder}
           onCreate={(dir, fileName) => createInFolder(dir, fileName)}
@@ -1270,9 +1306,20 @@ export default function App() {
           onDelete={(node) => void exclusive(() => deleteEntry(node))}
           onReveal={(path) => void revealItemInDir(path)}
           onEscape={() => editor.current?.focus()}
-          outline={{ source, topLine: outlineTopLine, onScroll: onOutlineScroll, onJump: jumpToLine }}
+          outline={{
+            source,
+            topLine: outlineTopLine,
+            onScroll: onOutlineScroll,
+            onJump: (line) => {
+              if (narrow) setSidebarShown(false);
+              jumpToLine(line);
+            },
+          }}
           searchFocus={searchFocus}
-          onOpenHit={(hit) => void exclusive(() => openHit(hit))}
+          onOpenHit={(hit) => {
+            if (narrow) setSidebarShown(false);
+            void exclusive(() => openHit(hit));
+          }}
         />
         <Splitter label="Resize sidebar" onDrag={(x) => setSidebarWidth(clamp(x, SIDEBAR_MIN, SIDEBAR_MAX))} />
 

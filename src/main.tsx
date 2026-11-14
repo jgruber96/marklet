@@ -12,12 +12,17 @@ import "./styles/print.css";
 import App from "./App";
 import { applyAccent, applyTheme, cachedAccent, cachedTheme } from "./lib/stores/settings";
 import { installHoverTips } from "./lib/hoverTips";
+import { installIOSLayout } from "./lib/ios";
 import { isIOS } from "./lib/platform";
 
 applyTheme(cachedTheme());
 applyAccent(cachedAccent());
-// The iPadOS web view shows no tooltips, even with a mouse or trackpad: draw them.
-if (isIOS) installHoverTips();
+// iPad and iPhone: touch sizes, the on-screen keyboard and long-press (lib/ios.ts), and
+// hover labels for a mouse or trackpad, which the iPadOS web view never shows (lib/hoverTips.ts).
+if (isIOS) {
+  installIOSLayout();
+  installHoverTips();
+}
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

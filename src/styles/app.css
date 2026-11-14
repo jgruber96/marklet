@@ -115,6 +115,12 @@ button {
   color: var(--text);
 }
 
+/* A toggle that is on, such as the iPad's sidebar button. */
+.tb-btn.on {
+  background: color-mix(in srgb, var(--selected) 80%, transparent);
+  color: var(--text);
+}
+
 .tb-btn:disabled {
   opacity: 0.45;
   cursor: default;
@@ -1376,4 +1382,113 @@ body.resizing * {
   visibility: visible;
   opacity: 1;
   transition: opacity 0.12s ease-out;
+}
+
+/*
+ * iPad and iPhone (html.ios, set by lib/ios.ts): controls at least 44 pt for
+ * fingers, room for the system's rounded corners and home indicator, and the
+ * app sized to the part of the screen the on-screen keyboard leaves free.
+ */
+
+html.ios,
+html.ios body,
+html.ios #root {
+  height: var(--app-height, 100%);
+}
+
+html.ios .app {
+  box-sizing: border-box;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* No iOS link or image preview when pressing and holding the app's own controls (the hold opens their menu). */
+html.ios .toolbar,
+html.ios .tabstrip,
+html.ios .sidebar,
+html.ios .statusbar {
+  -webkit-touch-callout: none;
+}
+
+html.ios .toolbar {
+  height: 56px;
+}
+
+html.ios .tb-btn {
+  height: 44px;
+  min-width: 44px;
+}
+
+html.ios .segmented button {
+  height: 36px;
+  padding: 0 14px;
+}
+
+html.ios .tabstrip {
+  height: 48px;
+}
+
+html.ios .tab {
+  height: 40px;
+}
+
+html.ios .tab-close,
+html.ios .tab-new {
+  width: 36px;
+  height: 36px;
+}
+
+html.ios .tree-root,
+html.ios .tree-row,
+html.ios .outline-item,
+html.ios .menu-item {
+  height: 44px;
+}
+
+/* A wider grip on the dividers; the line drawn stays thin. */
+html.ios .splitter {
+  width: 21px;
+  margin: 0 -10px;
+}
+
+html.ios .splitter::after {
+  left: 10px;
+}
+
+html.ios .splitter:hover::after,
+html.ios .splitter.dragging::after {
+  left: 9px;
+}
+
+/* Sidebar shown or hidden (the sidebar button); hidden keeps its state. */
+.body.no-sidebar > .sidebar,
+.body.no-sidebar > .splitter {
+  display: none;
+}
+
+/* On a narrow screen (iPad in portrait) the sidebar slides over the page instead of squeezing it. */
+.body.sidebar-overlay {
+  position: relative;
+}
+
+.body.sidebar-overlay > .sidebar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 6;
+  max-width: calc(100% - 56px);
+  border-radius: 0 14px 14px 0;
+  background: var(--bar);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 18px 48px -12px rgb(0 0 0 / 45%);
+}
+
+.body.sidebar-overlay > .splitter {
+  display: none;
+}
+
+.sidebar-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: rgb(0 0 0 / 22%);
 }
