@@ -11,7 +11,9 @@ import {
   List,
   Menu as MenuIcon,
   PanelLeft,
+  Redo2,
   SquarePen,
+  Undo2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
@@ -22,6 +24,7 @@ import { appleKeys, isDesktop, isMacOS, isMobile } from "../lib/platform";
 import type { ViewMode } from "../lib/stores/settings";
 import type { ExportKind } from "../lib/export/export";
 import type { FormatKind } from "../lib/editor/format";
+import type { Room } from "../App";
 
 interface ToolbarProps {
   /** The app menu (File, Edit, View, Settings), built when it is opened. */
@@ -39,13 +42,15 @@ interface ToolbarProps {
   /** iPad and iPhone: the sidebar button. */
   sidebarShown: boolean;
   onToggleSidebar(): void;
+  /** How much room there is (always "wide" on desktop). Narrower, the bar keeps fewer buttons; the rest are in the menu. */
+  room: Room;
 }
 
-const viewModes: { mode: ViewMode; label: string }[] = [
-  { mode: "editor", label: "Editor" },
-  { mode: "split", label: "Split" },
-  { mode: "preview", label: "Preview" },
-  { mode: "rich", label: "Rich" },
+const viewModes: { mode: ViewMode; label: string; short: string }[] = [
+  { mode: "editor", label: "Editor", short: "Edit" },
+  { mode: "split", label: "Split", short: "Split" },
+  { mode: "preview", label: "Preview", short: "Preview" },
+  { mode: "rich", label: "Rich", short: "Rich" },
 ];
 
 const mod = appleKeys ? "⌘" : "Ctrl+";
@@ -103,7 +108,11 @@ const formatting: { kind: FormatKind; icon: typeof Bold; label: string; key?: st
   { kind: "bullet", icon: List, label: "Bulleted list" },
 ];
 
-export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpen, onOpenFolder, onFormat, onExport, sidebarShown, onToggleSidebar }: ToolbarProps) {
+export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpen, onOpenFolder, onFormat, onExport, sidebarShown, onToggleSidebar, room }: ToolbarProps) {
+  const phone = room === "phone";
+  const wide = room === "wide";
+  /** The view as shown: a phone shows Split as the editor alone. */
+  const shownMode: ViewMode = phone && viewMode === "split" ? "editor" : viewMode;
   /** Opens a menu under a toolbar button; `keyboard` when it was opened with a key rather than the mouse. */
   const dropDown = (button: HTMLElement, items: MenuItem[], keyboard: boolean, align: "left" | "right" = "left") => {
     const box = button.getBoundingClientRect();
@@ -163,12 +172,17 @@ export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpe
           <div className="tb-sep" />
         </>
       )}
-      <button className="tb-btn icon pop-pink" onClick={onNew} aria-label="New" title={`New (${mod}N)`}>
-        <SquarePen size={16} />
-      </button>
-      <button className="tb-btn icon pop-cyan" onClick={onOpen} aria-label="Open file" title={`Open file (${mod}O)`}>
-        <FileText size={16} />
-      </button>
+      {/* On a phone, New is the tab strip's + and the rest of these are in the menu. */}
+      {!phone && (
+        <button className="tb-btn icon pop-pink" onClick={onNew} aria-label="New" title={`New (${mod}N)`}>
+          <SquarePen size={16} />
+        </button>
+      )}
+      {wide && (
+        <button className="tb-btn icon pop-cyan" onClick={onOpen} aria-label="Open file" title={`Open file (${mod}O)`}>
+          <FileText size={16} />
+        </button>
+      )}
       {/* iOS: the workspace is always the app's Documents folder; there is no folder to pick. */}
       {isDesktop && (
         <button className="tb-btn icon pop-amber" onClick={onOpenFolder} aria-label="Open folder" title={`Open folder (${mod}Shift+O)`}>
@@ -176,22 +190,27 @@ export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpe
         </button>
       )}
 
-      <div className="tb-sep" />
+      {/* Narrower than "wide", the formatting buttons are in the bar along the bottom (FormatBar). */}
+      {wide && (
+        <>
+          <div className="tb-sep" />
 
-      {formatting.map(({ kind, icon: Icon, label, key }) => (
-        <button
-          key={kind}
-          className="tb-btn icon"
-          disabled={viewMode === "preview"}
-          aria-label={label}
-          title={key ? `${label} (${mod}${key})` : label}
-          // Keep focus (and the selection) in the editor.
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onFormat(kind)}
-        >
-          <Icon size={16} />
-        </button>
-      ))}
+          {formatting.map(({ kind, icon: Icon, label, key }) => (
+            <button
+              key={kind}
+              className="tb-btn icon"
+              disabled={viewMode === "preview"}
+              aria-label={label}
+              title={key ? `${label} (${mod}${key})` : label}
+              // Keep focus (and the selection) in the editor.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onFormat(kind)}
+            >
+              <Icon size={16} />
+            </button>
+          ))}
+        </>
+      )}
 
       {ownTitleBar ? (
         <div className="tb-title" {...drag}>
@@ -205,30 +224,60 @@ export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpe
       )}
 
       <div className="segmented" role="group" aria-label="View mode">
-        {viewModes.map(({ mode, label }) => (
+        {/* A phone shows one pane at a time: no Split. */}
+        {viewModes.filter(({ mode }) => !(phone && mode === "split")).map(({ mode, label, short }) => (
           <button
             key={mode}
-            className={mode === viewMode ? "active" : undefined}
-            aria-pressed={mode === viewMode}
+            className={mode === shownMode ? "active" : undefined}
+            aria-pressed={mode === shownMode}
             onClick={() => onViewMode(mode)}
           >
-            {label}
+            {phone ? short : label}
           </button>
         ))}
       </div>
 
-      <button
-        className="tb-btn"
-        aria-haspopup="menu"
-        aria-label="Export"
-        title={`Export as HTML (${mod}Shift+E) or PDF (${mod}P)`}
-        onClick={(e) => showExportMenu(e.currentTarget, e.detail === 0)}
-      >
-        <Download size={16} />
-        <ChevronDown size={14} />
-      </button>
+      {/* On a phone, Export is in the menu (File). */}
+      {!phone && (
+        <button
+          className="tb-btn"
+          aria-haspopup="menu"
+          aria-label="Export"
+          title={`Export as HTML (${mod}Shift+E) or PDF (${mod}P)`}
+          onClick={(e) => showExportMenu(e.currentTarget, e.detail === 0)}
+        >
+          <Download size={16} />
+          <ChevronDown size={14} />
+        </button>
+      )}
 
       {ownTitleBar && <WindowButtons />}
     </header>
+  );
+}
+
+/**
+ * The formatting buttons along the bottom, when the toolbar has no room for
+ * them (iPad in portrait, iPhone, an iPhone Duo): with the app sized to what
+ * the on-screen keyboard leaves free, this bar sits just above the keyboard.
+ */
+export function FormatBar({ onFormat, onUndo, onRedo }: { onFormat(kind: FormatKind): void; onUndo(): void; onRedo(): void }) {
+  // Keep focus in the editor, so the keyboard stays up and the selection stays put.
+  const keep = (e: { preventDefault(): void }) => e.preventDefault();
+  return (
+    <div className="formatbar" role="toolbar" aria-label="Formatting">
+      {formatting.map(({ kind, icon: Icon, label, key }) => (
+        <button key={kind} className="tb-btn icon" aria-label={label} title={key ? `${label} (${mod}${key})` : label} onPointerDown={keep} onMouseDown={keep} onClick={() => onFormat(kind)}>
+          <Icon size={18} />
+        </button>
+      ))}
+      <div className="tb-spacer" />
+      <button className="tb-btn icon" aria-label="Undo" title={`Undo (${mod}Z)`} onPointerDown={keep} onMouseDown={keep} onClick={onUndo}>
+        <Undo2 size={18} />
+      </button>
+      <button className="tb-btn icon" aria-label="Redo" title={`Redo (${mod}Shift+Z)`} onPointerDown={keep} onMouseDown={keep} onClick={onRedo}>
+        <Redo2 size={18} />
+      </button>
+    </div>
   );
 }

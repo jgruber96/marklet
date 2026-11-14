@@ -25,6 +25,11 @@ export function installIOSLayout(): void {
   if (view) {
     const fit = () => {
       root.style.setProperty("--app-height", `${Math.round(view.height)}px`);
+      // The keyboard is up: the status bar steps aside, and when little is left (a phone on its
+      // side) the tab strip does too, so the text keeps most of the space.
+      const keyboard = window.innerHeight - view.height > 120;
+      root.classList.toggle("keyboard-up", keyboard);
+      root.classList.toggle("short", keyboard && view.height < 480);
       if (window.scrollY !== 0) window.scrollTo(0, 0);
     };
     view.addEventListener("resize", fit);

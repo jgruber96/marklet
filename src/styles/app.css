@@ -1492,3 +1492,48 @@ html.ios .splitter.dragging::after {
   z-index: 5;
   background: rgb(0 0 0 / 22%);
 }
+
+/*
+ * Formatting bar (components/Toolbar.tsx, FormatBar): along the bottom when the
+ * toolbar has no room for the buttons, just above the on-screen keyboard.
+ */
+.formatbar {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 2px 6px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  -webkit-touch-callout: none;
+}
+
+.formatbar .tb-btn {
+  flex: 1 1 0;
+  min-width: 36px;
+  max-width: 56px;
+}
+
+/* Phone width: tighter view switch and dialogs. */
+@media (max-width: 599px) {
+  html.ios .segmented button {
+    padding: 0 10px;
+  }
+
+  html.ios .modal-backdrop {
+    padding: 10px;
+  }
+
+  html.ios .modal-body {
+    padding: 0 14px 16px;
+  }
+
+  html.ios .select {
+    min-width: 0;
+    max-width: 52vw;
+  }
+}
+
+/* With the on-screen keyboard up (lib/ios.ts), make room for the text. */
+html.ios.keyboard-up .statusbar,
+html.ios.short .tabstrip {
+  display: none;
+}

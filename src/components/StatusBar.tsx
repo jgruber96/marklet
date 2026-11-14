@@ -11,10 +11,23 @@ interface StatusBarProps {
   words: number;
   /** Text size multiplier; shown when it is not 100%. */
   zoom: number;
+  /** A phone: only the word count and whether it is saved. */
+  compact?: boolean;
 }
 
-export function StatusBar({ doc, dirty, autosave, line, col, selected, words, zoom }: StatusBarProps) {
+export function StatusBar({ doc, dirty, autosave, line, col, selected, words, zoom, compact }: StatusBarProps) {
   const state = dirty ? "Unsaved" : doc.path ? "Saved" : "New file";
+  if (compact) {
+    return (
+      <footer className="statusbar">
+        <span>
+          {words.toLocaleString()} {words === 1 ? "word" : "words"}
+        </span>
+        <span className="spacer" />
+        <span className={`save-state${dirty ? " unsaved" : doc.path ? "" : " fresh"}`}>{state}</span>
+      </footer>
+    );
+  }
   return (
     <footer className="statusbar">
       <span>Markdown</span>
