@@ -72,7 +72,10 @@
         "name": "Markdown",
         "description": "Markdown document",
         "role": "Editor",
-        "mimeType": "text/markdown"
+        "mimeType": "text/markdown",
+        "contentTypes": [
+          "net.daringfireball.markdown"
+        ]
       }
     ]
   }
