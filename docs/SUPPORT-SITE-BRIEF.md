@@ -15,7 +15,7 @@ Everything needed to build a support and marketing site for Marklet that matches
 | **Category** | Productivity |
 | **Price / account** | Free. No account, no sign-in, no subscription. |
 | **Current version** | 0.7.0 (Nov 13, 2026). 1.0 is planned once 0.7.0 has been in daily use for a while. |
-| **Platforms** | Windows 10/11 (x64) and macOS 13 Ventura or later on Apple Silicon. iPhone and iPad are planned (`docs/IOS-BRIEF.md`). |
+| **Platforms** | Windows 10/11 (x64) and macOS 13 Ventura or later on Apple Silicon, released. **iPhone and iPad (iOS / iPadOS 17+, one universal app) are in development for the App Store** (`docs/IOS-BRIEF.md`). |
 | **License** | MIT. Bundled Inter and JetBrains Mono fonts are under the SIL Open Font License. |
 | **Source and downloads** | https://github.com/jgruber96/marklet · releases: https://github.com/jgruber96/marklet/releases/latest |
 
@@ -253,7 +253,7 @@ Current screenshots (1280 × 800, taken from the running app) are in `docs/scree
 | `rich-dark.png` | Rich view: symbols hidden, task boxes and code drawn in place |
 | `menu-dark.png` | The app menu open on View |
 
-Good additional shots for the site: the welcome note in Rich view, the command palette, Focus mode, a table being edited, a Mermaid diagram, and the Settings window with the six accent swatches. These are Windows captures; the App Store needs Mac captures of the Mac build (§11).
+Mobile screenshots should come from the iOS app itself (on iOS there is no glow hairline along the top of the screen). Good additional desktop shots for the site: the welcome note in Rich view, the command palette, Focus mode, a table being edited, a Mermaid diagram, and the Settings window with the six accent swatches. These are Windows captures; the App Store needs Mac captures of the Mac build (§11).
 
 ## 9. Build and technical facts
 
@@ -264,13 +264,14 @@ Good additional shots for the site: the welcome note in Rich view, the command p
 | Editor | CodeMirror 6 |
 | Rendering | markdown-it, Shiki (code), KaTeX (math), Mermaid (diagrams), DOMPurify (sanitizing) |
 | Bundle identifier | `us.darkstardev.marklet` |
-| Minimum OS | Windows 10 (x64, WebView2 runtime, built into Windows 11); macOS 13 Ventura on Apple Silicon (no Intel build) |
+| Minimum OS | Windows 10 (x64, WebView2 runtime, built into Windows 11); macOS 13 Ventura on Apple Silicon (no Intel build); iOS and iPadOS 17 (iPhone and iPad, one universal app) |
 | Download sizes (0.7.0) | Windows installer (`.exe`) 7.5 MB, `.msi` 9.2 MB; Mac `.dmg` 10.6 MB |
 | Mac signing | Developer ID Application certificate, notarized and stapled by Apple; opens without a warning |
 | Windows signing | Not code-signed: SmartScreen asks once on first install ("More info" › "Run anyway") |
 | Updates | Built in. Checks GitHub Releases at startup; every update is signed with the project's update key and verified before installing |
 | Release pipeline | GitHub Actions builds both platforms from a version tag, runs unit tests and a smoke test of the running app, then signs, notarizes and publishes |
 | File formats | Opens and saves `.md` and `.markdown` (UTF-8, keeps line endings and BOM); exports `.html` and `.pdf` |
+| iPhone and iPad (in development) | Notes live in Marklet's own folder, visible in the Files app (On My iPhone / iPad › Marklet); a `.md` file can be opened from Files with "Open in Marklet". Layouts for iPad, and for iPhone in phone, medium and wide sizes. Updates come from the App Store (no built-in updater). Export as PDF is not available on iOS yet |
 | Where things are stored | Notes: wherever the user keeps them. Settings, recent files and crash-recovery copies: the app's data folder (`%APPDATA%\us.darkstardev.marklet` on Windows, `~/Library/Application Support/us.darkstardev.marklet` on Mac) |
 
 ### Keyboard shortcuts (Ctrl on Windows, Cmd on Mac)
@@ -293,7 +294,7 @@ Good additional shots for the site: the welcome note in Rich view, the command p
 
 Marklet collects no data. There is no account, analytics, telemetry, advertising or tracking. It contacts the internet in two cases only:
 
-1. **Update checks** (desktop builds): at startup, and from Check for Updates, it asks GitHub for the latest release and downloads the update if the user chooses to install it. GitHub sees the request's IP address, as for any download. Nothing about the user or their notes is sent.
+1. **Update checks** (Windows and direct Mac builds only; the App Store versions are updated by the App Store): at startup, and from Check for Updates, it asks GitHub for the latest release and downloads the update if the user chooses to install it. GitHub sees the request's IP address, as for any download. Nothing about the user or their notes is sent.
 2. **Content a note points to**: an image in a note that has a web address is loaded from that address, and links open in the browser.
 
 Notes stay on the user's computer. Settings, the recent-files list and crash-recovery copies are stored locally only. For the App Store's privacy section this is **"Data Not Collected"**.
@@ -318,15 +319,15 @@ Suggested pages:
 
 The contact address and a legal contact name are yours to decide; this brief deliberately does not include one.
 
-**Mac App Store screenshots** must be 16:10 at one of 1280 × 800, 1440 × 900, 2560 × 1600 or 2880 × 1800, taken on a Mac. The app icon is supplied by the build (`icon.icns`), with the 1024 × 1024 PNG used for the listing.
+**Screenshots for the listing:** iPhone and iPad screenshots taken from the iOS app, at the device sizes App Store Connect asks for when you upload (it lists the accepted pixel sizes per display). For a Mac App Store listing, 16:10 Mac screenshots at 1280 × 800, 1440 × 900, 2560 × 1600 or 2880 × 1800. The 1024 × 1024 icon (`docs/icon/marklet-1024.png`) matches the app icon in the iOS project.
 
-### Note: the App Store build differs from today's Mac build
+### Note: App Store builds differ from today's direct downloads
 
-Today's Mac app is distributed directly (signed with Developer ID and notarized, from GitHub). An App Store version is a separate build target:
+The iPhone and iPad app is the natural App Store listing, and is being built for it (`docs/IOS-BRIEF.md`). Today's Mac app is distributed directly (signed with Developer ID and notarized, from GitHub). An App Store version is a separate build target:
 
 - **Different certificate and a provisioning profile:** "Apple Distribution" (Mac App Store) or the iOS equivalent, instead of Developer ID.
 - **App Sandbox is required on the Mac App Store.** Opening any folder, watching it for changes and saving images next to a note need sandbox entitlements and security-scoped bookmarks.
 - **No built-in updater:** the App Store handles updates, so the GitHub updater must be turned off in that build.
-- **iPhone and iPad** follow `docs/IOS-BRIEF.md`.
+- **iPhone and iPad** follow `docs/IOS-BRIEF.md`: no updater, notes in the app's Files folder, and PDF export still to come.
 
 None of this affects the support site, but it decides what the site says about downloading: an App Store badge for the store build, and GitHub for the direct Windows and Mac builds.
