@@ -12,6 +12,10 @@
 # Nothing is published unless both builds and the smoke test of the running
 # app (tests/smoke/run.mjs) pass.
 #
+# Besides the versioned files, each release carries Marklet-Windows-Setup.exe
+# and Marklet-Mac.dmg: the same installers under fixed names, which the
+# website's download buttons link to (releases/latest/download/<name>).
+#
 # Run it by hand (Actions > Release > Run workflow) for a test build: the
 # installers are attached to the run as artifacts, the publish job rehearses
 # everything but the release itself, and nothing is published.
@@ -129,8 +133,12 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then
             cp "$bundle/nsis/Marklet_${version}_x64-setup.exe" "$bundle/nsis/Marklet_${version}_x64-setup.exe.sig" out/
             cp "$bundle/msi/Marklet_${version}_x64_en-US.msi" out/
+            # The same installer under a name that never changes, so the website can link
+            # straight to it: .../releases/latest/download/Marklet-Windows-Setup.exe
+            cp "$bundle/nsis/Marklet_${version}_x64-setup.exe" out/Marklet-Windows-Setup.exe
           else
             cp "$bundle/dmg/Marklet_${version}_aarch64.dmg" out/
+            cp "$bundle/dmg/Marklet_${version}_aarch64.dmg" out/Marklet-Mac.dmg
             # Installed Macs update from the app itself, packed; named per version on the release.
             cp "$bundle/macos/Marklet.app.tar.gz" "out/Marklet_${version}_aarch64.app.tar.gz"
             cp "$bundle/macos/Marklet.app.tar.gz.sig" "out/Marklet_${version}_aarch64.app.tar.gz.sig"
