@@ -317,7 +317,7 @@ Suggested pages:
 4. **Privacy policy**: §10, dated, naming DarkstarDEV.
 5. **Release notes**: from `CHANGELOG.md`.
 
-The contact address and a legal contact name are yours to decide; this brief deliberately does not include one.
+**Contact and privacy policy:** use the same format and the same support email address as the existing DarkstarDEV support pages. The privacy policy follows their layout too, with the Marklet-specific content from §10.
 
 **Screenshots for the listing:** iPhone and iPad screenshots taken from the iOS app, at the device sizes App Store Connect asks for when you upload (it lists the accepted pixel sizes per display). For a Mac App Store listing, 16:10 Mac screenshots at 1280 × 800, 1440 × 900, 2560 × 1600 or 2880 × 1800. The 1024 × 1024 icon (`docs/icon/marklet-1024.png`) matches the app icon in the iOS project.
 
