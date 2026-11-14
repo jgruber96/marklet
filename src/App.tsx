@@ -775,9 +775,15 @@ export default function App() {
 
   // ---- Export ----
 
+  /** iOS: puts the on-screen keyboard away, so a print or share sheet opens from the bottom as usual, not where the keyboard was. */
+  const dismissKeyboard = () => {
+    if (isMobile && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  };
+
   const exportAs = async (kind: ExportKind) => {
     const tab = activeTab();
     if (!tab) return;
+    dismissKeyboard();
     const name = docName(tab.doc);
     try {
       if (kind === "html" && isMobile) {
@@ -825,6 +831,7 @@ export default function App() {
     "export-html": () => exportAs("html"),
     // iOS: the note itself, through the share sheet (saved first, so what is shared is what is on screen).
     share: withActive(async (tab) => {
+      dismissKeyboard();
       updateDirty(tab);
       if ((tab.dirty || !tab.doc.path) && !(await saveTab(tab))) return;
       try {
@@ -877,7 +884,7 @@ export default function App() {
   const last = useRef({ id: "", at: 0 });
 
   /** Runs a file action unless one is in progress; `wait` queues it behind instead. */
-  const exclusive = async (fn: () => Promise<unknown>, wait = false) => {
+  const exclusive = async (fn: () => Promise<unknown>, wait = false, refocus = !wait) => {
     if (busy.current && !wait) return;
     const run = queue.current.then(async () => {
       busy.current = true;
@@ -889,7 +896,7 @@ export default function App() {
     });
     queue.current = run.catch(() => {});
     await run;
-    if (!wait) editor.current?.focus();
+    if (refocus) editor.current?.focus();
   };
 
   const run = (id: string) => {
@@ -897,7 +904,9 @@ export default function App() {
     const now = performance.now();
     if (!action || (last.current.id === id && now - last.current.at < 400)) return;
     last.current = { id, at: now };
-    void exclusive(action);
+    // iOS: a print or share sheet is now showing; putting the cursor back would raise the keyboard under it.
+    const sheet = isMobile && (id === "share" || id.startsWith("export-"));
+    void exclusive(action, false, !sheet);
   };
 
   useEffect(() => {
