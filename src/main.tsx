@@ -11,9 +11,13 @@ import "./styles/preview.css";
 import "./styles/print.css";
 import App from "./App";
 import { applyAccent, applyTheme, cachedAccent, cachedTheme } from "./lib/stores/settings";
+import { installHoverTips } from "./lib/hoverTips";
+import { isIOS } from "./lib/platform";
 
 applyTheme(cachedTheme());
 applyAccent(cachedAccent());
+// The iPadOS web view shows no tooltips, even with a mouse or trackpad: draw them.
+if (isIOS) installHoverTips();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

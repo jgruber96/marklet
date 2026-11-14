@@ -1350,3 +1350,30 @@ body.resizing * {
     outline-offset: -2px;
   }
 }
+
+/* Hover labels on iPad with a mouse or trackpad (lib/hoverTips.ts); desktop uses the system's tooltips. */
+.hover-tip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  max-width: min(320px, calc(100vw - 12px));
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: var(--bar);
+  color: var(--text);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 6px 18px -6px rgb(0 0 0 / 40%);
+  font: 12px/1.35 var(--font-ui);
+  white-space: pre-line;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+}
+
+.hover-tip.shown {
+  visibility: visible;
+  opacity: 1;
+  transition: opacity 0.12s ease-out;
+}

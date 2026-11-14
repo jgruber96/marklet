@@ -152,9 +152,12 @@ export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpe
       <button className="tb-btn icon pop-cyan" onClick={onOpen} aria-label="Open file" title={`Open file (${mod}O)`}>
         <FileText size={16} />
       </button>
-      <button className="tb-btn icon pop-amber" onClick={onOpenFolder} aria-label="Open folder" title={`Open folder (${mod}Shift+O)`}>
-        <FolderOpen size={16} />
-      </button>
+      {/* iOS: the workspace is always the app's Documents folder; there is no folder to pick. */}
+      {isDesktop && (
+        <button className="tb-btn icon pop-amber" onClick={onOpenFolder} aria-label="Open folder" title={`Open folder (${mod}Shift+O)`}>
+          <FolderOpen size={16} />
+        </button>
+      )}
 
       <div className="tb-sep" />
 

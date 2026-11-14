@@ -781,6 +781,8 @@ export default function App() {
       if (path) await openPath(path);
     },
     "open-folder": async () => {
+      // iOS: the workspace is always the app's Documents folder.
+      if (isMobile) return;
       const dir = await pickFolder();
       if (dir) await setWorkspace(dir);
     },
