@@ -94,11 +94,121 @@ pub async fn print_to_pdf(window: tauri::WebviewWindow, path: String) -> Result<
     window.print().map_err(|e| e.to_string())
 }
 
-/// iOS: Tauri has no printing there. PDF export will come through WKWebView's
-/// createPDF and the share sheet (phase 5 of docs/IOS-BRIEF.md).
-#[cfg(mobile)]
+/// iOS: the system print sheet, laid out with the print stylesheet like the
+/// desktop's PDF. Its Share button saves the PDF to Files or sends it on, as
+/// the macOS print dialog's PDF button does. `title` names the PDF.
+#[cfg(target_os = "ios")]
+#[tauri::command]
+pub async fn print_to_pdf(window: tauri::WebviewWindow, path: String, title: Option<String>) -> Result<(), String> {
+    let _ = path;
+    let title = title.unwrap_or_else(|| "Marklet".into());
+    window
+        .with_webview(move |webview| unsafe { ios::print(webview.inner().cast(), &title) })
+        .map_err(|e| e.to_string())
+}
+
+/// iOS: the share sheet for a file (Save to Files, AirDrop, Mail, Messages…).
+#[cfg(target_os = "ios")]
+#[tauri::command]
+pub async fn share_file(window: tauri::WebviewWindow, path: String) -> Result<(), String> {
+    if !std::path::Path::new(&path).is_file() {
+        return Err(format!("Could not share {path}: it is not saved yet."));
+    }
+    window
+        .with_webview(move |webview| unsafe { ios::share(webview.inner().cast(), webview.view_controller().cast(), &path) })
+        .map_err(|e| e.to_string())
+}
+
+/// iOS: an export (`name`, `text`) written to the app's temporary folder and
+/// handed to the share sheet; nothing is left in the notes folder.
+#[cfg(target_os = "ios")]
+#[tauri::command]
+pub async fn share_export(window: tauri::WebviewWindow, name: String, text: String) -> Result<(), String> {
+    let file = std::path::Path::new(&name).file_name().ok_or("Not a file name")?.to_owned();
+    let dir = std::env::temp_dir().join("exports");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Could not export: {e}"))?;
+    let path = dir.join(file);
+    std::fs::write(&path, text).map_err(|e| format!("Could not export: {e}"))?;
+    share_file(window, path.to_string_lossy().into_owned()).await
+}
+
+/// Other mobile targets (not built today): no printing or sharing yet.
+#[cfg(all(mobile, not(target_os = "ios")))]
 #[tauri::command]
 pub async fn print_to_pdf(path: String) -> Result<(), String> {
     let _ = path;
-    Err("PDF export isn't available on iPhone and iPad yet. Export to HTML works.".into())
+    Err("PDF export isn't available here yet.".into())
+}
+
+#[cfg(all(mobile, not(target_os = "ios")))]
+#[tauri::command]
+pub async fn share_file(path: String) -> Result<(), String> {
+    let _ = path;
+    Err("Sharing isn't available here yet.".into())
+}
+
+#[cfg(all(mobile, not(target_os = "ios")))]
+#[tauri::command]
+pub async fn share_export(name: String, text: String) -> Result<(), String> {
+    let _ = (name, text);
+    Err("Sharing isn't available here yet.".into())
+}
+
+/// UIKit calls for printing and the share sheet. They run on the main thread
+/// (`with_webview` calls its closure there); `webview` is the app's WKWebView
+/// and `controller` the view controller that holds it.
+#[cfg(target_os = "ios")]
+mod ios {
+    use block2::Block;
+    use objc2::rc::{Allocated, Retained};
+    use objc2::runtime::{AnyObject, Bool};
+    use objc2::{class, msg_send};
+    use objc2_core_foundation::{CGPoint, CGRect, CGSize};
+    use objc2_foundation::{NSArray, NSString, NSURL};
+
+    /// iPad shows these sheets as popovers, which must point at something.
+    unsafe fn is_pad() -> bool {
+        let device: *mut AnyObject = msg_send![class!(UIDevice), currentDevice];
+        let idiom: isize = msg_send![device, userInterfaceIdiom];
+        idiom == 1 // UIUserInterfaceIdiomPad
+    }
+
+    /// A point near the top right of the view, where the Export and menu buttons are.
+    unsafe fn anchor(view: *mut AnyObject) -> CGRect {
+        let bounds: CGRect = msg_send![view, bounds];
+        CGRect::new(CGPoint::new((bounds.size.width - 60.0).max(0.0), 40.0), CGSize::new(1.0, 1.0))
+    }
+
+    pub unsafe fn print(webview: *mut AnyObject, title: &str) {
+        let info: *mut AnyObject = msg_send![class!(UIPrintInfo), printInfo];
+        let name = NSString::from_str(title);
+        let _: () = msg_send![info, setJobName: &*name];
+        let formatter: *mut AnyObject = msg_send![webview, viewPrintFormatter];
+        let controller: *mut AnyObject = msg_send![class!(UIPrintInteractionController), sharedPrintController];
+        let _: () = msg_send![controller, setPrintInfo: info];
+        let _: () = msg_send![controller, setPrintFormatter: formatter];
+        let done: Option<&Block<dyn Fn(*mut AnyObject, Bool, *mut AnyObject)>> = None;
+        if is_pad() {
+            let _: Bool = msg_send![controller, presentFromRect: anchor(webview), inView: webview, animated: true, completionHandler: done];
+        } else {
+            let _: Bool = msg_send![controller, presentAnimated: true, completionHandler: done];
+        }
+    }
+
+    pub unsafe fn share(webview: *mut AnyObject, controller: *mut AnyObject, path: &str) {
+        let url = NSURL::fileURLWithPath(&NSString::from_str(path));
+        let items = NSArray::from_retained_slice(&[url]);
+        let none: Option<&AnyObject> = None;
+        let alloc: Allocated<AnyObject> = msg_send![class!(UIActivityViewController), alloc];
+        let sheet: Retained<AnyObject> = msg_send![alloc, initWithActivityItems: &*items, applicationActivities: none];
+        if is_pad() {
+            let popover: *mut AnyObject = msg_send![&*sheet, popoverPresentationController];
+            if !popover.is_null() {
+                let _: () = msg_send![popover, setSourceView: webview];
+                let _: () = msg_send![popover, setSourceRect: anchor(webview)];
+            }
+        }
+        let done: Option<&Block<dyn Fn()>> = None;
+        let _: () = msg_send![controller, presentViewController: &*sheet, animated: true, completion: done];
+    }
 }

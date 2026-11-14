@@ -1396,6 +1396,13 @@ html.ios #root {
   height: var(--app-height, 100%);
 }
 
+/* The page itself never scrolls: iOS shifting it to show the cursor would slide the toolbar off the top. */
+html.ios body {
+  position: fixed;
+  inset: 0 0 auto;
+  width: 100%;
+}
+
 html.ios .app {
   box-sizing: border-box;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
