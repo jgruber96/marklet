@@ -272,7 +272,7 @@ Mobile screenshots should come from the iOS app itself (on iOS there is no glow 
 | Updates | Built in. Checks GitHub Releases at startup; every update is signed with the project's update key and verified before installing |
 | Release pipeline | GitHub Actions builds both platforms from a version tag, runs unit tests and a smoke test of the running app, then signs, notarizes and publishes |
 | File formats | Opens and saves `.md` and `.markdown` (UTF-8, keeps line endings and BOM); exports `.html` and `.pdf` |
-| iPhone and iPad (in development) | Notes live in Marklet's own folder, visible in the Files app (On My iPhone / iPad › Marklet); a `.md` file can be opened from Files with "Open in Marklet". Layouts for iPad, and for iPhone in phone, medium and wide sizes. Updates come from the App Store (no built-in updater). Export as PDF is not available on iOS yet |
+| iPhone and iPad (in development) | Notes live in Marklet's own folder, visible in the Files app (On My iPhone / iPad › Marklet); a `.md` file can be opened from Files with "Open in Marklet". Layouts for iPad, and for iPhone in phone, medium and wide sizes. Updates come from the App Store (no built-in updater). Notes can be shared, and exported as a PDF (from the print sheet) or a standalone web page |
 | Where things are stored | Notes: wherever the user keeps them. Settings, recent files and crash-recovery copies: the app's data folder (`%APPDATA%\us.darkstardev.marklet` on Windows, `~/Library/Application Support/us.darkstardev.marklet` on Mac) |
 
 ### Keyboard shortcuts (Ctrl on Windows, Cmd on Mac)
@@ -329,6 +329,6 @@ The iPhone and iPad app is the natural App Store listing, and is being built for
 - **Different certificate and a provisioning profile:** "Apple Distribution" (Mac App Store) or the iOS equivalent, instead of Developer ID.
 - **App Sandbox is required on the Mac App Store.** Opening any folder, watching it for changes and saving images next to a note need sandbox entitlements and security-scoped bookmarks.
 - **No built-in updater:** the App Store handles updates, so the GitHub updater must be turned off in that build.
-- **iPhone and iPad** follow `docs/IOS-BRIEF.md`: no updater, notes in the app's Files folder, and PDF export still to come.
+- **iPhone and iPad** follow `docs/IOS-BRIEF.md`: no updater, and notes in the app's Files folder.
 
 None of this affects the support site, but it decides what the site says about downloading: an App Store badge for the store build, and GitHub for the direct Windows and Mac builds.
