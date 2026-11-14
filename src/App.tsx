@@ -801,6 +801,11 @@ export default function App() {
         const path = await pickExportPath("html", tab.doc.path, name);
         if (!path) return;
         await writeHtml(path, await buildHtml(textOf(tab), dirOf(tab.doc.path), name, theme.current, accent.current));
+      } else if (isMobile) {
+        // iOS: the PDF is laid out from the standalone page (as Export as HTML makes it, in the light
+        // print colors), then goes to the share sheet. Drawing the live window gave blank pages there.
+        const html = await buildHtml(textOf(tab), dirOf(tab.doc.path), name, "light", accent.current);
+        await invoke("print_to_pdf", { path: "", title: name.replace(/\.(md|markdown)$/i, ""), html });
       } else {
         const path = pdfNeedsPath ? await pickExportPath("pdf", tab.doc.path, name) : null;
         if (pdfNeedsPath && !path) return;

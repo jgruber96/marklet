@@ -100,7 +100,7 @@ pub async fn print_to_pdf(window: tauri::WebviewWindow, path: String) -> Result<
 /// and Print. If the PDF can't be made, the print sheet opens instead.
 #[cfg(target_os = "ios")]
 #[tauri::command]
-pub async fn print_to_pdf(window: tauri::WebviewWindow, path: String, title: Option<String>) -> Result<(), String> {
+pub async fn print_to_pdf(window: tauri::WebviewWindow, path: String, title: Option<String>, html: Option<String>) -> Result<(), String> {
     let _ = path;
     let title = title.unwrap_or_else(|| "Marklet".into());
     let name: String = title.chars().map(|c| if matches!(c, '/' | '\\' | ':') { '-' } else { c }).collect();
@@ -111,7 +111,12 @@ pub async fn print_to_pdf(window: tauri::WebviewWindow, path: String, title: Opt
     window
         .with_webview(move |webview| unsafe {
             let view = webview.inner().cast();
-            if ios::pdf(view, &file) {
+            // The standalone page when the front end sends it (it lays out reliably); else the live window.
+            let made = match &html {
+                Some(html) => ios::pdf(ios::html_formatter(html), &file),
+                None => ios::pdf(ios::view_formatter(view), &file),
+            };
+            if made {
                 ios::share(view, webview.view_controller().cast(), &file);
             } else {
                 ios::print(view, &title);
@@ -192,10 +197,22 @@ mod ios {
     const PAGE: (f64, f64) = (612.0, 792.0);
     const MARGIN: f64 = 43.2;
 
-    /// Lays the web view out as printed pages (its print formatter applies the print
-    /// stylesheet, so only the note shows) and writes them to `path` as a PDF.
-    pub unsafe fn pdf(webview: *mut AnyObject, path: &str) -> bool {
+    /// A print formatter for an HTML page (the standalone export page).
+    pub unsafe fn html_formatter(html: &str) -> Retained<AnyObject> {
+        let markup = NSString::from_str(html);
+        let alloc: Allocated<AnyObject> = msg_send![class!(UIMarkupTextPrintFormatter), alloc];
+        msg_send![alloc, initWithMarkupText: &*markup]
+    }
+
+    /// The live web view's print formatter (the print stylesheet applies, so only the note shows).
+    pub unsafe fn view_formatter(webview: *mut AnyObject) -> Retained<AnyObject> {
         let formatter: *mut AnyObject = msg_send![webview, viewPrintFormatter];
+        Retained::retain(formatter).expect("a web view always has a print formatter")
+    }
+
+    /// Lays `formatter` out as printed pages and writes them to `path` as a PDF.
+    pub unsafe fn pdf(formatter: Retained<AnyObject>, path: &str) -> bool {
+        let formatter: &AnyObject = &formatter;
         let renderer: Retained<AnyObject> = msg_send![class!(UIPrintPageRenderer), new];
         let _: () = msg_send![&*renderer, addPrintFormatter: formatter, startingAtPageAtIndex: 0isize];
         let paper = CGRect::new(CGPoint::new(0.0, 0.0), CGSize::new(PAGE.0, PAGE.1));
