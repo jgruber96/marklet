@@ -121,6 +121,27 @@ Every push also runs the checks in `.github/workflows/ci.yml` on Windows and mac
 
 Back up the key file. If it is lost, installed copies can no longer be updated automatically and need a manual reinstall with a new key. Version 0.1.0 has no updater; it is replaced by installing 0.2.0 by hand. Macs auto-update from the first release that includes the Mac build (0.5.0).
 
+## Releasing to TestFlight (iPhone and iPad)
+
+The iOS app is built and uploaded from a Mac with Xcode, Rust's iOS targets and the `src-tauri/gen/apple` project (see `docs/IOS-BRIEF.md`). It is signed with the DarkstarDEV team (`developmentTeam` in `tauri.conf.json`) and listed in App Store Connect as `us.darkstardev.marklet`. The iOS app has no updater: testers get new builds from TestFlight, and later customers from the App Store.
+
+1. **Build** from an up-to-date `main`, raising the build number by one each upload:
+
+   ```bash
+   git switch main && git pull
+   npm run tauri ios build -- --export-method app-store-connect --build-number 3
+   ```
+
+   The build number is added to the version (`0.7.0` with build `3` is `0.7.0.3`), and App Store Connect only accepts a number higher than the last upload of that version. A new version (set as for a desktop release) can start again at 1. The last lines of the output name the `.ipa`, usually under `src-tauri/gen/apple/build/arm64/`.
+
+2. **Upload** the `.ipa` with Apple's **Transporter** app (free, Mac App Store): sign in, drag it in, **Deliver**. App Store Connect processes it in about 10–20 minutes.
+
+3. **Testers.** Internal testers (App Store Connect users) get the build as soon as it is processed. External testers (any Apple ID, by email or public link) get it after Beta App Review, which the first build of a version goes through; later builds of the same version usually pass straight away.
+
+The upload needs two things already in the project: the privacy manifest (`src-tauri/gen/apple/marklet_iOS/PrivacyInfo.xcprivacy`) and `ITSAppUsesNonExemptEncryption = NO` in `Info.plist` and `project.yml`. To try a build on a device first, plug it in, unlock it and run `npm run tauri ios dev` with it selected; the simulators (`npm run tauri ios dev "iPhone Duo"`) need no signing at all.
+
+The App Store listing text, privacy answers and screenshot list are in `docs/APP-STORE-LISTING.md`.
+
 ## Keyboard shortcuts
 
 Ctrl on Windows, Cmd on macOS.
