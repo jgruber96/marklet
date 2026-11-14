@@ -1542,3 +1542,17 @@ html.ios.short .tabstrip {
 html.ios .app::before {
   display: none;
 }
+
+/*
+ * iPhone Duo (html.side-status, lib/ios.ts): iOS reports a tall top margin across the whole
+ * width, but only the top-right corner holds the clock and Wi-Fi. The toolbar and tabs move up
+ * into the band and stop short of that corner instead.
+ */
+html.ios.side-status .app {
+  padding-top: 8px;
+}
+
+html.ios.side-status .toolbar,
+html.ios.side-status .tabstrip {
+  padding-right: max(var(--status-corner, 104px), env(safe-area-inset-right));
+}

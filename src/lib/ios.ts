@@ -37,7 +37,28 @@ export function installIOSLayout(): void {
     fit();
   }
 
+  installSideStatus();
   installLongPress();
+}
+
+/**
+ * Above this, a top safe-area margin is not a status bar across the top (iPad about 24 pt,
+ * iPhone notch or Dynamic Island about 47–62 pt) but the iPhone Duo's: its clock and Wi-Fi sit
+ * in a small column in the top corner, yet iOS reports a margin of about 100 pt across the
+ * whole width. Then the app uses the band and keeps clear of the corner only (app.css).
+ */
+const SIDE_STATUS_MIN = 80;
+
+function installSideStatus(): void {
+  const root = document.documentElement;
+  // env() can only be read through a style: an invisible probe takes the top margin as its height.
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;top:0;left:0;width:0;height:env(safe-area-inset-top);visibility:hidden;pointer-events:none";
+  document.body.appendChild(probe);
+  const check = () => root.classList.toggle("side-status", probe.getBoundingClientRect().height >= SIDE_STATUS_MIN);
+  window.addEventListener("resize", check);
+  window.addEventListener("orientationchange", () => window.setTimeout(check, 300));
+  check();
 }
 
 function installLongPress(): void {
