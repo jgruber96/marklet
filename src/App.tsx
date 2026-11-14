@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { EditorView } from "@codemirror/view";
-import { ask, message } from "@tauri-apps/plugin-dialog";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { EditorState, StateEffect } from "@codemirror/state";
 import { Editor, type EditorHandle } from "./lib/editor/Editor";
@@ -775,17 +775,25 @@ export default function App() {
 
   // ---- Export ----
 
+  /** iOS: puts the on-screen keyboard away, so a print or share sheet opens from the bottom as usual, not where the keyboard was. */
+  const dismissKeyboard = () => {
+    if (isMobile && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  };
+
   const exportAs = async (kind: ExportKind) => {
     const tab = activeTab();
     if (!tab) return;
+    dismissKeyboard();
     const name = docName(tab.doc);
     try {
-      if (kind === "html") {
+      if (kind === "html" && isMobile) {
+        // iOS: no save dialog; the page goes straight to the share sheet (Save to Files, AirDrop, Mail…).
+        const html = await buildHtml(textOf(tab), dirOf(tab.doc.path), name, theme.current, accent.current);
+        await invoke("share_export", { name: `${name.replace(/\.(md|markdown)$/i, "")}.html`, text: html });
+      } else if (kind === "html") {
         const path = await pickExportPath("html", tab.doc.path, name);
         if (!path) return;
         await writeHtml(path, await buildHtml(textOf(tab), dirOf(tab.doc.path), name, theme.current, accent.current));
-        // iOS: there was no save dialog, so say where it went.
-        if (isMobile) await message(`Saved “${baseName(path)}” in Marklet's folder. Open it from the Files app to share it.`, { title: "Marklet", kind: "info" });
       } else {
         const path = pdfNeedsPath ? await pickExportPath("pdf", tab.doc.path, name) : null;
         if (pdfNeedsPath && !path) return;
@@ -821,6 +829,17 @@ export default function App() {
     "next-tab": async () => cycleTab(1),
     "prev-tab": async () => cycleTab(-1),
     "export-html": () => exportAs("html"),
+    // iOS: the note itself, through the share sheet (saved first, so what is shared is what is on screen).
+    share: withActive(async (tab) => {
+      dismissKeyboard();
+      updateDirty(tab);
+      if ((tab.dirty || !tab.doc.path) && !(await saveTab(tab))) return;
+      try {
+        await invoke("share_file", { path: tab.doc.path });
+      } catch (err) {
+        await showError(err);
+      }
+    }),
     "export-pdf": () => exportAs("pdf"),
     "check-updates": () => checkForUpdate(true, readyToRestart),
     find: async () => {
@@ -865,7 +884,7 @@ export default function App() {
   const last = useRef({ id: "", at: 0 });
 
   /** Runs a file action unless one is in progress; `wait` queues it behind instead. */
-  const exclusive = async (fn: () => Promise<unknown>, wait = false) => {
+  const exclusive = async (fn: () => Promise<unknown>, wait = false, refocus = !wait) => {
     if (busy.current && !wait) return;
     const run = queue.current.then(async () => {
       busy.current = true;
@@ -877,7 +896,7 @@ export default function App() {
     });
     queue.current = run.catch(() => {});
     await run;
-    if (!wait) editor.current?.focus();
+    if (refocus) editor.current?.focus();
   };
 
   const run = (id: string) => {
@@ -885,7 +904,9 @@ export default function App() {
     const now = performance.now();
     if (!action || (last.current.id === id && now - last.current.at < 400)) return;
     last.current = { id, at: now };
-    void exclusive(action);
+    // iOS: a print or share sheet is now showing; putting the cursor back would raise the keyboard under it.
+    const sheet = isMobile && (id === "share" || id.startsWith("export-"));
+    void exclusive(action, false, !sheet);
   };
 
   useEffect(() => {
@@ -997,6 +1018,7 @@ export default function App() {
           sep,
           item("export-html", "Export as HTML…", "Ctrl+Shift+E"),
           item("export-pdf", "Export as PDF…", "Ctrl+P"),
+          ...(isMobile ? [item("share", "Share…")] : []),
           sep,
           item("close-tab", "Close Tab", "Ctrl+W"),
           // iOS apps are not quit from inside.

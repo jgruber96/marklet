@@ -112,6 +112,8 @@ pub fn run() {
         fs::path_kind,
         fs::search_folder,
         fs::mobile_workspace,
+        export::share_file,
+        export::share_export,
         recovery::recovery_write,
         recovery::recovery_remove,
         recovery::recovery_list,

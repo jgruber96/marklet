@@ -144,7 +144,8 @@ export async function printPdf(path: string | null, title: string): Promise<void
   const previous = document.title;
   document.title = title.replace(/\.(md|markdown)$/i, ""); // the print dialog's default file name
   try {
-    await invoke("print_to_pdf", { path: path ?? "" });
+    // `title` names the PDF on iOS; the desktop takes it from the page title above.
+    await invoke("print_to_pdf", { path: path ?? "", title: document.title });
   } finally {
     document.title = previous;
   }
