@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { EditorView } from "@codemirror/view";
-import { ask, message } from "@tauri-apps/plugin-dialog";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { EditorState, StateEffect } from "@codemirror/state";
 import { Editor, type EditorHandle } from "./lib/editor/Editor";
@@ -780,12 +780,14 @@ export default function App() {
     if (!tab) return;
     const name = docName(tab.doc);
     try {
-      if (kind === "html") {
+      if (kind === "html" && isMobile) {
+        // iOS: no save dialog; the page goes straight to the share sheet (Save to Files, AirDrop, Mail…).
+        const html = await buildHtml(textOf(tab), dirOf(tab.doc.path), name, theme.current, accent.current);
+        await invoke("share_export", { name: `${name.replace(/\.(md|markdown)$/i, "")}.html`, text: html });
+      } else if (kind === "html") {
         const path = await pickExportPath("html", tab.doc.path, name);
         if (!path) return;
         await writeHtml(path, await buildHtml(textOf(tab), dirOf(tab.doc.path), name, theme.current, accent.current));
-        // iOS: there was no save dialog, so say where it went.
-        if (isMobile) await message(`Saved “${baseName(path)}” in Marklet's folder. Open it from the Files app to share it.`, { title: "Marklet", kind: "info" });
       } else {
         const path = pdfNeedsPath ? await pickExportPath("pdf", tab.doc.path, name) : null;
         if (pdfNeedsPath && !path) return;
@@ -821,6 +823,16 @@ export default function App() {
     "next-tab": async () => cycleTab(1),
     "prev-tab": async () => cycleTab(-1),
     "export-html": () => exportAs("html"),
+    // iOS: the note itself, through the share sheet (saved first, so what is shared is what is on screen).
+    share: withActive(async (tab) => {
+      updateDirty(tab);
+      if ((tab.dirty || !tab.doc.path) && !(await saveTab(tab))) return;
+      try {
+        await invoke("share_file", { path: tab.doc.path });
+      } catch (err) {
+        await showError(err);
+      }
+    }),
     "export-pdf": () => exportAs("pdf"),
     "check-updates": () => checkForUpdate(true, readyToRestart),
     find: async () => {
@@ -997,6 +1009,7 @@ export default function App() {
           sep,
           item("export-html", "Export as HTML…", "Ctrl+Shift+E"),
           item("export-pdf", "Export as PDF…", "Ctrl+P"),
+          ...(isMobile ? [item("share", "Share…")] : []),
           sep,
           item("close-tab", "Close Tab", "Ctrl+W"),
           // iOS apps are not quit from inside.
