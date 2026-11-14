@@ -10,6 +10,7 @@ import {
   Link,
   List,
   Menu as MenuIcon,
+  PanelLeft,
   SquarePen,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -17,7 +18,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { showMenu, type MenuItem } from "./PopupMenu";
 import appIcon from "../assets/icon.svg";
-import { appleKeys, isDesktop, isMacOS } from "../lib/platform";
+import { appleKeys, isDesktop, isMacOS, isMobile } from "../lib/platform";
 import type { ViewMode } from "../lib/stores/settings";
 import type { ExportKind } from "../lib/export/export";
 import type { FormatKind } from "../lib/editor/format";
@@ -35,6 +36,9 @@ interface ToolbarProps {
   onOpenFolder(): void;
   onFormat(kind: FormatKind): void;
   onExport(kind: ExportKind): void;
+  /** iPad and iPhone: the sidebar button. */
+  sidebarShown: boolean;
+  onToggleSidebar(): void;
 }
 
 const viewModes: { mode: ViewMode; label: string }[] = [
@@ -53,6 +57,8 @@ const mod = appleKeys ? "⌘" : "Ctrl+";
  * window. macOS keeps its own title bar and menu bar; iOS has no window frame.
  */
 const ownTitleBar = isTauri() && isDesktop && !isMacOS;
+/** The app menu under a button: on Windows (no menu bar) and on iPad and iPhone (no menus at all). */
+const menuButton = ownTitleBar || isMobile;
 /** Marks an empty area of the bar as a handle for moving the window. */
 const drag = ownTitleBar ? { "data-tauri-drag-region": true } : {};
 
@@ -97,7 +103,7 @@ const formatting: { kind: FormatKind; icon: typeof Bold; label: string; key?: st
   { kind: "bullet", icon: List, label: "Bulleted list" },
 ];
 
-export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpen, onOpenFolder, onFormat, onExport }: ToolbarProps) {
+export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpen, onOpenFolder, onFormat, onExport, sidebarShown, onToggleSidebar }: ToolbarProps) {
   /** Opens a menu under a toolbar button; `keyboard` when it was opened with a key rather than the mouse. */
   const dropDown = (button: HTMLElement, items: MenuItem[], keyboard: boolean, align: "left" | "right" = "left") => {
     const box = button.getBoundingClientRect();
@@ -123,7 +129,7 @@ export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpe
 
   // F10 opens the menu, as it does for a menu bar.
   useEffect(() => {
-    if (!ownTitleBar) return;
+    if (!menuButton) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "F10" || e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) return;
       const button = document.querySelector<HTMLElement>(".toolbar .menu-button");
@@ -137,12 +143,23 @@ export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpe
 
   return (
     <header className={`toolbar${ownTitleBar ? " titlebar" : ""}`} {...drag}>
-      {ownTitleBar && (
+      {ownTitleBar && <img className="app-icon" src={appIcon} alt="" draggable={false} {...drag} />}
+      {menuButton && (
         <>
-          <img className="app-icon" src={appIcon} alt="" draggable={false} {...drag} />
-          <button className="tb-btn icon menu-button" aria-label="Menu" aria-haspopup="menu" title="Menu: File, Edit, View, Settings (F10)" onClick={(e) => showAppMenu(e.currentTarget, e.detail === 0)}>
+          <button
+            className="tb-btn icon menu-button"
+            aria-label="Menu"
+            aria-haspopup="menu"
+            title={isMobile ? "Menu: File, Edit, View, Settings" : "Menu: File, Edit, View, Settings (F10)"}
+            onClick={(e) => showAppMenu(e.currentTarget, e.detail === 0)}
+          >
             <MenuIcon size={16} />
           </button>
+          {isMobile && (
+            <button className={`tb-btn icon${sidebarShown ? " on" : ""}`} aria-label="Sidebar" aria-pressed={sidebarShown} title="Files and outline" onClick={onToggleSidebar}>
+              <PanelLeft size={16} />
+            </button>
+          )}
           <div className="tb-sep" />
         </>
       )}
