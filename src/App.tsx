@@ -349,14 +349,21 @@ export default function App() {
   };
 
   /** Opens a file in a tab (or shows its tab); false if it could not be read. */
-  const openPath = async (path: string): Promise<boolean> => {
+  const openPath = async (given: string): Promise<boolean> => {
+    // iOS: a note in Marklet's folder, however the Files app spelled its path (/private/var…), opens by Marklet's own.
+    const path = await currentPath(given);
     const existing = findTab(path);
     if (existing) {
       show(existing.id);
       return true;
     }
     try {
-      const { doc, text } = await readDoc(path);
+      // iOS: a note just handed over by the Files app may still be settling; one more try after a moment.
+      const { doc, text } = await readDoc(path).catch(async (err) => {
+        if (!isMobile) throw err;
+        await new Promise((r) => setTimeout(r, 400));
+        return readDoc(path);
+      });
       addTab(doc, text);
       noteRecent(path);
       return true;
@@ -366,7 +373,7 @@ export default function App() {
       if (documents && !isInside(path, documents)) {
         await showError(
           `Marklet can only open notes in its own folder for now. In the Files app, copy “${baseName(path)}” ` +
-            "into On My iPhone (or iPad) › Marklet, then open it from there.",
+            `into On My iPhone (or iPad) › Marklet, then open it from there.\n\n(${String(err)})`,
         );
       } else await showError(err);
       return false;

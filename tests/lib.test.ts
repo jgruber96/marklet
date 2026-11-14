@@ -33,6 +33,18 @@ describe("iOS paths after the app's folder moves", () => {
   it("moves a note from an earlier Documents folder into today's", () => {
     expect(intoDocuments("/private/var/mobile/Containers/Data/Application/OLD/Documents/Notes/a.md", now)).toBe(`${now}/Notes/a.md`);
   });
+  it("reads a note from the Files app by Marklet's own spelling of the path", () => {
+    expect(intoDocuments("/var/mobile/Containers/Data/Application/NEW/Documents/d.md", now)).toBe(`${now}/d.md`);
+    expect(isInside("/var/mobile/Containers/Data/Application/NEW/Documents/d.md", now)).toBe(true);
+  });
+  it("leaves a folder that is merely called Documents alone", () => {
+    const other = "/private/var/mobile/Containers/Shared/AppGroup/X/File Provider Storage/Documents/f.md";
+    expect(intoDocuments(other, now)).toBe(other);
+  });
+  it("leaves iCloud Drive paths alone", () => {
+    const cloud = "/private/var/mobile/Library/Mobile Documents/com~apple~CloudDocs/e.md";
+    expect(intoDocuments(cloud, now)).toBe(cloud);
+  });
   it("leaves paths already in today's folder, and anything else, alone", () => {
     expect(intoDocuments(`${now}/b.md`, now)).toBe(`${now}/b.md`);
     expect(intoDocuments("C:\\Notes\\c.md", now)).toBe("C:\\Notes\\c.md");

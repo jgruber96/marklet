@@ -22,8 +22,16 @@ export const baseName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
 export const isAbsolutePath = (path: string) => /^[a-z]:[\\/]/i.test(path) || /^[\\/]/.test(path);
 
-/** Windows and macOS file systems are case-insensitive by default. */
-const normalize = (path: string) => path.replace(/[\\/]+$/, "").replace(/\\/g, "/").toLowerCase();
+/**
+ * Windows and macOS file systems are case-insensitive by default. On iOS, /var is a link to
+ * /private/var, and a file opened from the Files app can arrive spelled either way.
+ */
+const normalize = (path: string) =>
+  path
+    .replace(/[\\/]+$/, "")
+    .replace(/\\/g, "/")
+    .replace(/^\/private(?=\/var\/)/, "")
+    .toLowerCase();
 
 export const samePath = (a: string, b: string) => normalize(a) === normalize(b);
 
@@ -43,10 +51,11 @@ export const reroot = (path: string, from: string, to: string) => to + path.slic
  * Documents folder into `documents`; any other path comes back unchanged.
  */
 export function intoDocuments(path: string, documents: string): string {
-  const marker = "/Documents/";
-  const at = path.indexOf(marker);
-  if (at < 0 || isInside(path, documents)) return path;
-  return documents.replace(/\/+$/, "") + path.slice(at + marker.length - 1);
+  // An app's own Documents folder (…/Containers/Data/Application/<id>/Documents/), however it is
+  // spelled (/private/var or /var); never a folder that merely happens to be called Documents.
+  const container = /\/Containers\/Data\/Application\/[^/]+\/Documents(?=\/)/.exec(path);
+  if (!container) return path;
+  return documents.replace(/\/+$/, "") + path.slice(container.index + container[0].length);
 }
 
 export const isMarkdownPath = (path: string) => /\.(md|markdown)$/i.test(path);
