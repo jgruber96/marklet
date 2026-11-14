@@ -1537,3 +1537,8 @@ html.ios.keyboard-up .statusbar,
 html.ios.short .tabstrip {
   display: none;
 }
+
+/* The glow hairline marks a window's top edge on desktop; against a phone or tablet's rounded screen edge it looks like a stray line. */
+html.ios .app::before {
+  display: none;
+}
