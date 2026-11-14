@@ -58,6 +58,8 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         # The Documents folder shows in the Files app (On My iPhone/iPad › Marklet), and
         # "Open in Marklet" opens a file where it is rather than a copy.
+        # No network connections on iOS: nothing to declare for export compliance.
+        ITSAppUsesNonExemptEncryption: false
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         UTImportedTypeDeclarations:

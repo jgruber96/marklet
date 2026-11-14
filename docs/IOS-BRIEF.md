@@ -82,6 +82,17 @@ Everything else in Rust (`read_file`, `write_file` with line endings/BOM, `list_
 | 5. Export & share | WKWebView PDF, HTML via share sheet, photo insert | PDF and HTML exports open correctly from Files |
 | 6. Ship | TestFlight build to family testers, App Store listing, privacy label ("no data collected"), screenshots | Approved on the App Store |
 | Later | iCloud Drive sync, external folders via bookmarks, iPad multi-window, Mac Catalyst not needed (desktop app exists) | — |
+| Possible | Mac App Store version of the desktop app (see below) | Not decided |
+
+## Possible: Mac App Store version
+
+**Status: a possibility, not planned.** The App Store record covers iOS and macOS under one bundle ID (`us.darkstardev.marklet`), so a Mac App Store build would join the same listing as a universal purchase. The macOS app today is distributed directly (GitHub releases, built-in updater), and a Mac App Store build would need:
+
+- **App Sandbox.** Marklet may only touch files and folders the user picked in an Open dialog. Reopening the last folder and tabs at launch needs security-scoped bookmarks saved with the session; the same work lets iOS open notes in place from iCloud Drive.
+- **No self-update.** The updater plugin is left out of the Mac App Store build; the App Store updates it.
+- **Two Mac builds.** The direct download (with the updater) stays for people outside the App Store, so the build gains a Mac App Store variant with its own entitlements and signing.
+
+Done when: the sandboxed build opens a folder, restores it after a restart, and passes Mac App Store review.
 
 ## CI
 

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B1C2D3E4F5A60718293A4B5D /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* PrivacyInfo.xcprivacy */; };
 		052C7B3AB2D0FBD2B31ABC32 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C0221B6E8CF50C4044AAB3FA /* CoreGraphics.framework */; };
 		1264909C30369701F1F31FEC /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 698004A49F26B2147D303C5A /* Metal.framework */; };
 		22C9252804532005480C78B4 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 031FE2C7562C66AA3D0F1627 /* assets */; };
@@ -22,6 +23,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A1B2C3D4E5F60718293A4B5C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		031FE2C7562C66AA3D0F1627 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
 		0A6B3C397EAE70D7E525D838 /* launch.rs */ = {isa = PBXFileReference; path = launch.rs; sourceTree = "<group>"; };
 		11AF02EE70CC5FF7A69F550E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -119,6 +121,7 @@
 			children = (
 				8B8F24A279C2609FC8D19E0A /* Info.plist */,
 				ED0868E97D550351DD033E82 /* marklet_iOS.entitlements */,
+				A1B2C3D4E5F60718293A4B5C /* PrivacyInfo.xcprivacy */,
 			);
 			path = marklet_iOS;
 			sourceTree = "<group>";
@@ -223,6 +226,7 @@
 				3506B18143BFAFD2C9F97F0F /* Assets.xcassets in Resources */,
 				2C5EFDBCAEE16245B6672123 /* LaunchScreen.storyboard in Resources */,
 				22C9252804532005480C78B4 /* assets in Resources */,
+				B1C2D3E4F5A60718293A4B5D /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
