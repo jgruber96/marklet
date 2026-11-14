@@ -16,6 +16,7 @@ import { configureRich, setRich } from "./lib/editor/rich";
 import { setFocusMode } from "./lib/editor/focus";
 import { welcomeNote } from "./lib/welcome";
 import { openSearchPanel } from "@codemirror/search";
+import { redo, undo } from "@codemirror/commands";
 import { checkForUpdate } from "./lib/update";
 import { appleKeys as isMac, isDesktop, isMobile } from "./lib/platform";
 import { Sidebar } from "./lib/sidebar/Sidebar";
@@ -87,7 +88,7 @@ import { leftBehind, removeRecovery, writeRecovery } from "./lib/tabs/recovery";
 import { baseName, dirOf, isInside, isMarkdownPath, joinPath, reroot, samePath, withMarkdownExt } from "./lib/paths";
 import { Preview, type PreviewHandle } from "./lib/preview/Preview";
 import { ScrollSync } from "./lib/preview/scrollSync";
-import { Toolbar } from "./components/Toolbar";
+import { FormatBar, Toolbar } from "./components/Toolbar";
 import { TabStrip } from "./components/TabStrip";
 import { StatusBar } from "./components/StatusBar";
 import { Splitter } from "./components/Splitter";
@@ -95,9 +96,16 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { PopupMenuHost, type MenuItem } from "./components/PopupMenu";
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
 
-/** Narrower than this (iPad in portrait, iPhone), the sidebar slides over the page instead of sitting beside it. */
-const NARROW = 1000;
-const isNarrow = () => isMobile && window.innerWidth < NARROW;
+/**
+ * How much room the app has, on iPad and iPhone (desktop is always "wide"). By width, not device,
+ * so an iPhone Duo folded or unfolded and an app in Split View all get the layout that fits:
+ * - wide (1000 pt and up, iPad landscape): the desktop layout, sidebar beside the page;
+ * - medium (600–999 pt: iPad portrait, unfolded Duo): the sidebar slides over the page, and the
+ *   formatting buttons move from the toolbar to a bar above the keyboard;
+ * - phone (under 600 pt: iPhone, folded Duo): also one pane at a time (no Split view).
+ */
+export type Room = "wide" | "medium" | "phone";
+const roomNow = (): Room => (!isMobile || window.innerWidth >= 1000 ? "wide" : window.innerWidth >= 600 ? "medium" : "phone");
 
 const SIDEBAR_MIN = 180;
 const SIDEBAR_MAX = 420;
@@ -143,9 +151,10 @@ export default function App() {
   const autosaveTimer = useRef<number | undefined>(undefined);
   const scrollListeners = useRef(new Set<() => void>());
   const [sidebarWidth, setSidebarWidth] = useState(240);
-  /** iPad and iPhone: the sidebar button. On a narrow screen it starts hidden and slides over the page. */
-  const [narrow, setNarrow] = useState(isNarrow);
-  const [sidebarShown, setSidebarShown] = useState(() => !isNarrow());
+  /** iPad and iPhone: how much room there is, and the sidebar button. Short of "wide", the sidebar starts hidden and slides over the page. */
+  const [room, setRoom] = useState(roomNow);
+  const narrow = room !== "wide";
+  const [sidebarShown, setSidebarShown] = useState(() => roomNow() === "wide");
   const [split, setSplit] = useState(0.5);
   const [viewMode, setViewModeState] = useState<ViewMode>("split");
   const [source, setSource] = useState("");
@@ -1197,27 +1206,27 @@ export default function App() {
     };
   }, []);
 
-  // iPad turned between landscape and portrait: the sidebar sits beside the page or slides over it,
-  // and starts out shown or hidden to match.
+  // Turned, folded or unfolded, or resized in Split View: the layout follows the room. Going between
+  // wide and narrower, the sidebar starts out shown (beside the page) or hidden (over it) to match.
   useEffect(() => {
     if (!isMobile) return;
-    let was = isNarrow();
+    let was = roomNow();
     const onResize = () => {
-      const now = isNarrow();
+      const now = roomNow();
       if (now === was) return;
+      if ((now === "wide") !== (was === "wide")) setSidebarShown(now === "wide");
       was = now;
-      setNarrow(now);
-      setSidebarShown(!now);
+      setRoom(now);
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Scroll sync only makes sense with both panes on screen.
+  // Scroll sync only makes sense with both panes on screen (a phone shows Split as the editor alone).
   useEffect(() => {
-    scrollSync.current?.setEnabled(viewMode === "split");
+    scrollSync.current?.setEnabled(viewMode === "split" && room !== "phone");
     setRich(viewMode === "rich", editor.current?.view ?? null);
-  }, [viewMode]);
+  }, [viewMode, room]);
 
   // Closing the window asks about each unsaved tab in turn.
   useEffect(() => {
@@ -1249,8 +1258,8 @@ export default function App() {
     if (isTauri() && isDesktop) void getCurrentWindow().setTitle(`${dirty ? "● " : ""}${name} — Marklet`);
   }, [name, dirty]);
 
-  // In focus mode there is one column of text: Split shows its editor half only.
-  const layout: ViewMode = focus && viewMode === "split" ? "editor" : viewMode;
+  // In focus mode, and on a phone, there is one column of text: Split shows its editor half only.
+  const layout: ViewMode = (focus || room === "phone") && viewMode === "split" ? "editor" : viewMode;
 
   const resizeSplit = (clientX: number) => {
     const box = panes.current?.getBoundingClientRect();
@@ -1277,6 +1286,7 @@ export default function App() {
         onExport={(kind) => run(`export-${kind}`)}
         sidebarShown={sidebarShown}
         onToggleSidebar={() => setSidebarShown((shown) => !shown)}
+        room={room}
       />
       <TabStrip
         tabs={tabs.current.map((t) => ({ id: t.id, name: docName(t.doc), title: t.doc.path ?? docName(t.doc), dirty: t.dirty }))}
@@ -1400,7 +1410,15 @@ export default function App() {
         />
       )}
 
-      <StatusBar doc={doc} dirty={dirty} autosave={autosave} {...cursor} words={words} zoom={zoom} />
+      {/* Short of "wide", the formatting buttons sit at the bottom, just above the on-screen keyboard. */}
+      {room !== "wide" && layout !== "preview" && (
+        <FormatBar
+          onFormat={format}
+          onUndo={() => editor.current?.view && undo(editor.current.view)}
+          onRedo={() => editor.current?.view && redo(editor.current.view)}
+        />
+      )}
+      <StatusBar doc={doc} dirty={dirty} autosave={autosave} {...cursor} words={words} zoom={zoom} compact={room === "phone"} />
     </div>
   );
 }
