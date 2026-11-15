@@ -1,6 +1,6 @@
 [package]
 name = "marklet"
-version = "0.7.0"
+version = "0.7.1"
 description = "Marklet — a Markdown editor"
 authors = ["DarkstarDEV"]
 license = "MIT"

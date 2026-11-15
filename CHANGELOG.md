@@ -2,6 +2,11 @@
 
 What changed in each version of Marklet. Installed copies from 0.2.0 on update themselves.
 
+## 0.7.1 (2026-11-14)
+
+- **macOS:** the title bar blends into the app: the background reaches the top of the window, and the window buttons sit in the toolbar.
+- **iPhone and iPad:** notes open from the Files app (including when Marklet wasn't running), and Export as PDF makes the PDF and opens the share sheet, with no more blank pages.
+
 ## 0.7.0 (2026-11-13)
 
 - **Command palette:** Ctrl+T jumps to any note by a few letters of its name; Ctrl+Shift+P (or `>` in the box) finds any command.
