@@ -56,16 +56,38 @@ const viewModes: { mode: ViewMode; label: string; short: string }[] = [
 const mod = appleKeys ? "⌘" : "Ctrl+";
 
 /**
- * On Windows the app draws its own title bar: the window has no native frame,
- * and this toolbar is the top of the window. It carries the icon, the menu
- * button, the title and the window buttons, and its empty areas drag the
- * window. macOS keeps its own title bar and menu bar; iOS has no window frame.
+ * On desktop this toolbar is the top of the window and doubles as its title
+ * bar: it shows the title, and its empty areas drag the window.
+ * - Windows: the window has no native frame, so the bar also carries the icon,
+ *   the menu button and the window buttons.
+ * - macOS: the native title bar is see-through (overlay style, set in
+ *   tauri.macos.conf.json), so the app's background runs to the top edge and
+ *   the traffic lights float over the bar's left end. The menu bar stays native.
+ * iOS has no window frame.
  */
-const ownTitleBar = isTauri() && isDesktop && !isMacOS;
+const titleBar = isTauri() && isDesktop;
+/** Windows: the app draws the whole frame. */
+const ownFrame = titleBar && !isMacOS;
+/** macOS: room is left for the traffic lights. */
+const macTitleBar = titleBar && isMacOS;
 /** The app menu under a button: on Windows (no menu bar) and on iPad and iPhone (no menus at all). */
-const menuButton = ownTitleBar || isMobile;
+const menuButton = ownFrame || isMobile;
 /** Marks an empty area of the bar as a handle for moving the window. */
-const drag = ownTitleBar ? { "data-tauri-drag-region": true } : {};
+const drag = titleBar ? { "data-tauri-drag-region": true } : {};
+
+/** macOS hides the traffic lights in full screen, so the bar takes back their room. */
+function useFullscreen(): boolean {
+  const [fullscreen, setFullscreen] = useState(false);
+  useEffect(() => {
+    if (!macTitleBar) return;
+    const win = getCurrentWindow();
+    const update = () => void win.isFullscreen().then(setFullscreen, () => {});
+    update();
+    const unlisten = win.onResized(update);
+    return () => void unlisten.then((fn) => fn());
+  }, []);
+  return fullscreen;
+}
 
 function WindowButtons() {
   const [maximized, setMaximized] = useState(false);
@@ -110,6 +132,7 @@ const formatting: { kind: FormatKind; icon: typeof Bold; label: string; key?: st
 
 export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpen, onOpenFolder, onFormat, onExport, sidebarShown, onToggleSidebar, room }: ToolbarProps) {
   const phone = room === "phone";
+  const fullscreen = useFullscreen();
   const wide = room === "wide";
   /** The view as shown: a phone shows Split as the editor alone. */
   const shownMode: ViewMode = phone && viewMode === "split" ? "editor" : viewMode;
@@ -151,8 +174,11 @@ export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpe
   }, []);
 
   return (
-    <header className={`toolbar${ownTitleBar ? " titlebar" : ""}`} {...drag}>
-      {ownTitleBar && <img className="app-icon" src={appIcon} alt="" draggable={false} {...drag} />}
+    <header
+      className={`toolbar${titleBar ? " titlebar" : ""}${macTitleBar ? " mac" : ""}${fullscreen ? " fullscreen" : ""}`}
+      {...drag}
+    >
+      {ownFrame && <img className="app-icon" src={appIcon} alt="" draggable={false} {...drag} />}
       {menuButton && (
         <>
           <button
@@ -212,7 +238,7 @@ export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpe
         </>
       )}
 
-      {ownTitleBar ? (
+      {titleBar ? (
         <div className="tb-title" {...drag}>
           <span className="tb-title-name" {...drag}>
             {title}
@@ -251,7 +277,7 @@ export function Toolbar({ menu, title, dirty, viewMode, onViewMode, onNew, onOpe
         </button>
       )}
 
-      {ownTitleBar && <WindowButtons />}
+      {ownFrame && <WindowButtons />}
     </header>
   );
 }
