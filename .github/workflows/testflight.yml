@@ -1,9 +1,9 @@
-# Builds the iPhone and iPad app and uploads it to TestFlight.
+# Builds the iPhone and iPad app and, if asked, uploads it to TestFlight.
 #
-# Runs on every version tag, alongside the desktop release (see release.yml),
-# and by hand from Actions > TestFlight > Run workflow. A hand-started run
-# only builds and signs, unless "upload" is ticked: use it to check signing
-# without sending a build to testers.
+# By hand only (Actions > TestFlight > Run workflow): TestFlight builds are
+# made on the Mac and uploaded with Transporter (README: Releasing to
+# TestFlight). A run only builds and signs, to check signing, unless "upload"
+# is ticked. Version tags do not start it.
 #
 # Signing is automatic: Xcode creates or reuses the App Store distribution
 # certificate and profile for the DarkstarDEV team (developmentTeam in
@@ -20,8 +20,6 @@
 name: TestFlight
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
       upload:
@@ -36,7 +34,7 @@ jobs:
   ios:
     runs-on: macos-latest
     env:
-      UPLOAD: ${{ github.event_name == 'push' || inputs.upload }}
+      UPLOAD: ${{ inputs.upload }}
       BUILD_NUMBER: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v7

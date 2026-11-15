@@ -140,6 +140,8 @@ The iOS app is built and uploaded from a Mac with Xcode, Rust's iOS targets and 
 
 The upload needs two things already in the project: the privacy manifest (`src-tauri/gen/apple/marklet_iOS/PrivacyInfo.xcprivacy`) and `ITSAppUsesNonExemptEncryption = NO` in `Info.plist` and `project.yml`. To try a build on a device first, plug it in, unlock it and run `npm run tauri ios dev` with it selected; the simulators (`npm run tauri ios dev "iPhone Duo"`) need no signing at all.
 
+`.github/workflows/testflight.yml` can also build and sign the iOS app on GitHub (Actions › TestFlight › Run workflow), as a check that signing still works. It runs only by hand, and uploads only if **upload** is ticked; its build numbers start at 100, clear of the hand-numbered ones.
+
 The App Store listing text, privacy answers and screenshot list are in `docs/APP-STORE-LISTING.md`.
 
 ## Keyboard shortcuts
