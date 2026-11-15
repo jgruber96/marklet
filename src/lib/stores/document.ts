@@ -30,7 +30,9 @@ const markdownFilter = [{ name: "Markdown", extensions: ["md", "markdown"] }];
 
 export async function pickFileToOpen(): Promise<string | null> {
   const picked = await open({ multiple: false, directory: false, filters: markdownFilter });
-  return typeof picked === "string" ? picked : null;
+  if (typeof picked !== "string") return null;
+  // iOS's file picker answers with an address (file:///…), not a path.
+  return picked.startsWith("file://") ? decodeURIComponent(new URL(picked).pathname) : picked;
 }
 
 /**

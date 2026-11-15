@@ -26,6 +26,7 @@ import {
   countWords,
   docName,
   pickFileToOpen,
+  freePath,
   pickSavePath,
   readDoc,
   showError,
@@ -378,6 +379,35 @@ export default function App() {
       } else await showError(err);
       return false;
     }
+  };
+
+  /**
+   * iOS: a note picked with File › Open… arrives as a temporary copy. If Marklet's folder has a note of
+   * that name with the same text, that is the one picked, and it opens; anything else (iCloud Drive,
+   * another app) is copied into Marklet's folder and opens from there, so edits are kept.
+   */
+  const openPickedCopy = async (copy: string, documents: string) => {
+    const picked = await readDoc(copy).catch(async (err) => {
+      await showError(err);
+      return null;
+    });
+    if (!picked) return;
+    const name = baseName(copy);
+    const own = joinPath(documents, name);
+    const existing = await readDoc(own).catch(() => null);
+    if (existing && existing.text === picked.text) {
+      await openPath(own);
+      return;
+    }
+    const dest = await freePath(documents, name);
+    try {
+      await writeDoc(dest, picked.text, picked.doc);
+    } catch (err) {
+      await showError(err);
+      return;
+    }
+    await refreshTree();
+    await openPath(dest);
   };
 
   /** A result of the folder search: opens the file with the match selected. */
@@ -826,7 +856,11 @@ export default function App() {
     new: async () => newTab(),
     open: async () => {
       const path = await pickFileToOpen();
-      if (path) await openPath(path);
+      if (!path) return;
+      const documents = await documentsDir();
+      // iOS: the file picker hands over a temporary copy (…/tmp/…-Inbox/), never the note itself.
+      if (documents && !isInside(await currentPath(path), documents)) await openPickedCopy(path, documents);
+      else await openPath(path);
     },
     "open-folder": async () => {
       // iOS: the workspace is always the app's Documents folder.
