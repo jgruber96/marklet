@@ -31,7 +31,7 @@ A desktop Markdown editor for Windows and macOS (Apple Silicon), built with Taur
 - **Formatting** buttons and shortcuts, plus autosave after 2 seconds idle
 - **Export** to a standalone HTML file or to PDF
 - **Settings window** (Ctrl+,): theme, accent, editor and reading fonts, text size, line width, autosave and spell check
-- **Its own title bar** on Windows: the toolbar is the top of the window, with the menus behind a button (F10), drawn in the app's own look
+- **Its own title bar**: the toolbar is the top of the window, drawn in the app's own look. On Windows the menus are behind a button (F10); on macOS they stay in the menu bar, and the window buttons sit in the toolbar
 - **Light and dark** themes that follow the OS, with an override and six accent presets (Aurora by default), each with its own glow
 
 ## Screenshots
@@ -169,7 +169,7 @@ Ctrl on Windows, Cmd on macOS.
 
 ## macOS test checklist
 
-Run on macOS 13+ (Apple Silicon) with the first signed build (November 2026); repeat it for changes that touch menus, files or export. On the Mac, Marklet keeps the system title bar and menu bar (the custom title bar and popup app menu are Windows-only).
+Run on macOS 13+ (Apple Silicon) with the first signed build (November 2026); repeat it for changes that touch menus, files or export. On the Mac, the toolbar doubles as the title bar (the system title bar is see-through, with the window buttons over the toolbar's left end) and the menus stay in the system menu bar; the popup app menu and drawn window buttons are Windows-only.
 
 - [x] The signed, notarized app opens without a Gatekeeper warning
 - [x] The app menu holds Settings (Theme, Accent Color, Autosave) and Quit; Cmd+C/V/X/Z work in the editor
