@@ -898,10 +898,20 @@ body.resizing * {
   }
 }
 
-/* Windows: the toolbar is the window's title bar (see Toolbar.tsx). */
+/* Desktop: the toolbar is the window's title bar (see Toolbar.tsx). */
 
-.toolbar.titlebar {
+/* Windows: the window buttons sit flush with the right edge. */
+.toolbar.titlebar:not(.mac) {
   padding-right: 0;
+}
+
+/* macOS: room for the traffic lights (placed by trafficLightPosition in tauri.macos.conf.json). */
+.toolbar.titlebar.mac {
+  padding-left: 80px;
+}
+
+.toolbar.titlebar.mac.fullscreen {
+  padding-left: 12px;
 }
 
 .app-icon {
