@@ -120,16 +120,21 @@ pub fn run() {
         launch::take_launch_files
     ]);
 
-    builder
+    let app = builder
         .build(tauri::generate_context!())
-        .expect("error while building Marklet")
-        .run(|_app, _event| {
-            // macOS and iOS deliver opened files ("Open in Marklet") as an event, not as arguments.
-            #[cfg(any(target_os = "macos", target_os = "ios"))]
-            if let tauri::RunEvent::Opened { urls } = _event {
-                let files = urls.into_iter().filter_map(|u| u.to_file_path().ok());
-                let files = files.map(|p| p.to_string_lossy().into_owned()).collect();
-                launch::open_files(_app, files);
-            }
-        });
+        .expect("error while building Marklet");
+
+    // iOS: catch files that arrive with the launch itself, which tao drops (see launch::cold_open).
+    #[cfg(target_os = "ios")]
+    launch::cold_open::install();
+
+    app.run(|_app, _event| {
+        // macOS and iOS deliver opened files ("Open in Marklet") as an event, not as arguments.
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        if let tauri::RunEvent::Opened { urls } = _event {
+            let files = urls.into_iter().filter_map(|u| u.to_file_path().ok());
+            let files = files.map(|p| p.to_string_lossy().into_owned()).collect();
+            launch::open_files(_app, files);
+        }
+    });
 }

@@ -349,14 +349,21 @@ export default function App() {
   };
 
   /** Opens a file in a tab (or shows its tab); false if it could not be read. */
-  const openPath = async (path: string): Promise<boolean> => {
+  const openPath = async (given: string): Promise<boolean> => {
+    // iOS: a note in Marklet's folder, however the Files app spelled its path (/private/var…), opens by Marklet's own.
+    const path = await currentPath(given);
     const existing = findTab(path);
     if (existing) {
       show(existing.id);
       return true;
     }
     try {
-      const { doc, text } = await readDoc(path);
+      // iOS: a note just handed over by the Files app may still be settling; one more try after a moment.
+      const { doc, text } = await readDoc(path).catch(async (err) => {
+        if (!isMobile) throw err;
+        await new Promise((r) => setTimeout(r, 400));
+        return readDoc(path);
+      });
       addTab(doc, text);
       noteRecent(path);
       return true;
@@ -366,7 +373,7 @@ export default function App() {
       if (documents && !isInside(path, documents)) {
         await showError(
           `Marklet can only open notes in its own folder for now. In the Files app, copy “${baseName(path)}” ` +
-            "into On My iPhone (or iPad) › Marklet, then open it from there.",
+            `into On My iPhone (or iPad) › Marklet, then open it from there.\n\n(${String(err)})`,
         );
       } else await showError(err);
       return false;
@@ -794,6 +801,11 @@ export default function App() {
         const path = await pickExportPath("html", tab.doc.path, name);
         if (!path) return;
         await writeHtml(path, await buildHtml(textOf(tab), dirOf(tab.doc.path), name, theme.current, accent.current));
+      } else if (isMobile) {
+        // iOS: the PDF is laid out from the standalone page (as Export as HTML makes it, in the light
+        // print colors), then goes to the share sheet. Drawing the live window gave blank pages there.
+        const html = await buildHtml(textOf(tab), dirOf(tab.doc.path), name, "light", accent.current);
+        await invoke("print_to_pdf", { path: "", title: name.replace(/\.(md|markdown)$/i, ""), html });
       } else {
         const path = pdfNeedsPath ? await pickExportPath("pdf", tab.doc.path, name) : null;
         if (pdfNeedsPath && !path) return;

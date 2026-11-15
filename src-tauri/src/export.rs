@@ -94,16 +94,34 @@ pub async fn print_to_pdf(window: tauri::WebviewWindow, path: String) -> Result<
     window.print().map_err(|e| e.to_string())
 }
 
-/// iOS: the system print sheet, laid out with the print stylesheet like the
-/// desktop's PDF. Its Share button saves the PDF to Files or sends it on, as
-/// the macOS print dialog's PDF button does. `title` names the PDF.
+/// iOS: the PDF itself, laid out with the print stylesheet like the desktop's
+/// (US Letter, 0.6 in margins), written to the app's temporary folder as
+/// `<title>.pdf` and handed to the share sheet: Save to Files, AirDrop, Mail,
+/// and Print. If the PDF can't be made, the print sheet opens instead.
 #[cfg(target_os = "ios")]
 #[tauri::command]
-pub async fn print_to_pdf(window: tauri::WebviewWindow, path: String, title: Option<String>) -> Result<(), String> {
+pub async fn print_to_pdf(window: tauri::WebviewWindow, path: String, title: Option<String>, html: Option<String>) -> Result<(), String> {
     let _ = path;
     let title = title.unwrap_or_else(|| "Marklet".into());
+    let name: String = title.chars().map(|c| if matches!(c, '/' | '\\' | ':') { '-' } else { c }).collect();
+    let dir = std::env::temp_dir().join("exports");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Could not export: {e}"))?;
+    let file = dir.join(format!("{}.pdf", name.trim()));
+    let file = file.to_string_lossy().into_owned();
     window
-        .with_webview(move |webview| unsafe { ios::print(webview.inner().cast(), &title) })
+        .with_webview(move |webview| unsafe {
+            let view = webview.inner().cast();
+            // The standalone page when the front end sends it (it lays out reliably); else the live window.
+            let made = match &html {
+                Some(html) => ios::pdf(ios::html_formatter(html), &file),
+                None => ios::pdf(ios::view_formatter(view), &file),
+            };
+            if made {
+                ios::share(view, webview.view_controller().cast(), &file);
+            } else {
+                ios::print(view, &title);
+            }
+        })
         .map_err(|e| e.to_string())
 }
 
@@ -164,7 +182,62 @@ mod ios {
     use objc2::runtime::{AnyObject, Bool};
     use objc2::{class, msg_send};
     use objc2_core_foundation::{CGPoint, CGRect, CGSize};
-    use objc2_foundation::{NSArray, NSString, NSURL};
+    use objc2_foundation::{NSArray, NSRange, NSString, NSURL};
+
+    // UIKit's PDF drawing functions.
+    #[link(name = "UIKit", kind = "framework")]
+    extern "C" {
+        fn UIGraphicsBeginPDFContextToData(data: *mut AnyObject, bounds: CGRect, info: *mut AnyObject);
+        fn UIGraphicsBeginPDFPage();
+        fn UIGraphicsGetPDFContextBounds() -> CGRect;
+        fn UIGraphicsEndPDFContext();
+    }
+
+    /// US Letter, in points, and the desktop export's 0.6 in margins.
+    const PAGE: (f64, f64) = (612.0, 792.0);
+    const MARGIN: f64 = 43.2;
+
+    /// A print formatter for an HTML page (the standalone export page).
+    pub unsafe fn html_formatter(html: &str) -> Retained<AnyObject> {
+        let markup = NSString::from_str(html);
+        let alloc: Allocated<AnyObject> = msg_send![class!(UIMarkupTextPrintFormatter), alloc];
+        msg_send![alloc, initWithMarkupText: &*markup]
+    }
+
+    /// The live web view's print formatter (the print stylesheet applies, so only the note shows).
+    pub unsafe fn view_formatter(webview: *mut AnyObject) -> Retained<AnyObject> {
+        let formatter: *mut AnyObject = msg_send![webview, viewPrintFormatter];
+        Retained::retain(formatter).expect("a web view always has a print formatter")
+    }
+
+    /// Lays `formatter` out as printed pages and writes them to `path` as a PDF.
+    pub unsafe fn pdf(formatter: Retained<AnyObject>, path: &str) -> bool {
+        let formatter: &AnyObject = &formatter;
+        let renderer: Retained<AnyObject> = msg_send![class!(UIPrintPageRenderer), new];
+        let _: () = msg_send![&*renderer, addPrintFormatter: formatter, startingAtPageAtIndex: 0isize];
+        let paper = CGRect::new(CGPoint::new(0.0, 0.0), CGSize::new(PAGE.0, PAGE.1));
+        let printable = CGRect::new(CGPoint::new(MARGIN, MARGIN), CGSize::new(PAGE.0 - 2.0 * MARGIN, PAGE.1 - 2.0 * MARGIN));
+        // The page sizes are read-only properties, set through key-value coding as UIKit expects.
+        let paper_value: *mut AnyObject = msg_send![class!(NSValue), valueWithCGRect: paper];
+        let printable_value: *mut AnyObject = msg_send![class!(NSValue), valueWithCGRect: printable];
+        let _: () = msg_send![&*renderer, setValue: paper_value, forKey: &*NSString::from_str("paperRect")];
+        let _: () = msg_send![&*renderer, setValue: printable_value, forKey: &*NSString::from_str("printableRect")];
+
+        let data: *mut AnyObject = msg_send![class!(NSMutableData), data];
+        UIGraphicsBeginPDFContextToData(data, paper, std::ptr::null_mut());
+        let pages: isize = msg_send![&*renderer, numberOfPages];
+        let _: () = msg_send![&*renderer, prepareForDrawingPages: NSRange::new(0, pages.max(0) as usize)];
+        let bounds = UIGraphicsGetPDFContextBounds();
+        for page in 0..pages {
+            UIGraphicsBeginPDFPage();
+            let _: () = msg_send![&*renderer, drawPageAtIndex: page, inRect: bounds];
+        }
+        UIGraphicsEndPDFContext();
+        if pages <= 0 {
+            return false;
+        }
+        msg_send![data, writeToFile: &*NSString::from_str(path), atomically: true]
+    }
 
     /// iPad shows these sheets as popovers, which must point at something.
     unsafe fn is_pad() -> bool {
